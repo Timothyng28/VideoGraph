@@ -225,10 +225,12 @@ export const VideoController: React.FC<VideoControllerProps> = ({
             duration: 90,
             hasQuestion: false,
             questionText: undefined,
-            topic: topic,
+            topic: detail?.title || topic,
             difficulty: 'medium',
             generatedAt: new Date().toISOString(),
             videoUrl: sectionUrl,
+            thumbnailUrl: detail?.thumbnail_url,
+            title: detail?.title,
             renderingStatus: 'completed', // Already rendered
             voiceoverScript: voiceoverScript || undefined,
           };

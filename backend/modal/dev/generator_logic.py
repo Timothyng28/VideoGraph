@@ -763,15 +763,88 @@ Generate the fixed code now:"""
         scene_videos.sort(key=lambda x: x[0])
         scene_videos = [video for _, video in scene_videos]
         
+        # Generate titles for each section
+        print(f"\n{'─'*60}")
+        print("🏷️  Generating Section Titles")
+        print(f"{'─'*60}")
+        
+        section_titles = {}
+        
+        async def generate_section_title(section_info):
+            """Generate a title for a section."""
+            section_num, section = section_info
+            
+            try:
+                print(f"🏷️  [Section {section_num}] Generating title...")
+                
+                # Use the original section data from video_structure
+                section_data = video_structure[section_num - 1]
+                
+                title_prompt = f"""Generate a short, engaging title for this video section.
+
+Section: {section_data['section']}
+Content: {section_data['content']}
+
+Requirements:
+- Keep it concise (5-8 words maximum)
+- Make it engaging and clear
+- Reflect the main topic of the section
+- Use title case
+- Do NOT include quotes or extra formatting
+
+Return ONLY the title text, nothing else."""
+
+                title = await code_llm_service.generate_simple_async(
+                    prompt=title_prompt,
+                    max_tokens=50,
+                    temperature=0.7
+                )
+                
+                # Clean up the title
+                title = title.strip().strip('"\'')
+                
+                print(f"✓ [Section {section_num}] Title: {title}")
+                return (section_num, title, None)
+                
+            except Exception as e:
+                print(f"⚠️  [Section {section_num}] Title generation failed: {e}")
+                # Fall back to section name
+                fallback_title = section_data.get('section', f'Section {section_num}')
+                return (section_num, fallback_title, str(e))
+        
+        async def generate_all_titles():
+            """Generate titles for all successful sections."""
+            print(f"🎯 Generating titles for {len(successful_sections)} sections...")
+            tasks = [
+                generate_section_title((section_num, video_structure[section_num - 1]))
+                for section_num in sorted(successful_sections)
+            ]
+            results = await asyncio.gather(*tasks, return_exceptions=True)
+            return results
+        
+        title_results = asyncio.run(generate_all_titles())
+        
+        for section_num, title, error in title_results:
+            if not error:
+                section_titles[section_num] = title
+            else:
+                # Use fallback title
+                section_titles[section_num] = video_structure[section_num - 1].get('section', f'Section {section_num}')
+        
+        print(f"✓ Generated {len(section_titles)} section titles")
+
         # Build list of section URLs (sections are uploaded to GCS at {job_id}/section_{num}.mp4)
         section_urls = []
         section_details = []
         for section_num in sorted(successful_sections):
             section_url = f"https://storage.googleapis.com/vid-gen-static/{job_id}/section_{section_num}.mp4"
+            thumbnail_url = f"https://storage.googleapis.com/vid-gen-static/{job_id}/section_{section_num}_thumbnail.png"
             section_urls.append(section_url)
             section_details.append({
                 "section": section_num,
+                "title": section_titles.get(section_num, f"Section {section_num}"),
                 "video_url": section_url,
+                "thumbnail_url": thumbnail_url,
                 "voiceover_script": section_scripts.get(section_num, "")
             })
 

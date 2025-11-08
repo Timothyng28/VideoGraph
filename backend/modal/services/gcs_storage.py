@@ -224,6 +224,39 @@ class GCSStorageService:
             metadata=metadata
         )
     
+    def upload_scene_thumbnail(
+        self,
+        thumbnail_path: str,
+        job_id: str,
+        section_num: int
+    ) -> Optional[Dict[str, Any]]:
+        """
+        Upload a scene thumbnail to GCS.
+        
+        Args:
+            thumbnail_path: Path to the local thumbnail file (PNG)
+            job_id: Job identifier
+            section_num: Section number (1-indexed)
+            
+        Returns:
+            Dictionary with upload results
+        """
+        # Create GCS path: {job_id}/section_{section_num}_thumbnail.png
+        gcs_path = f"{job_id}/section_{section_num}_thumbnail.png"
+        
+        metadata = {
+            "job_id": job_id,
+            "section_num": str(section_num),
+            "type": "thumbnail"
+        }
+        
+        return self.upload_file(
+            local_path=thumbnail_path,
+            gcs_path=gcs_path,
+            content_type="image/png",
+            metadata=metadata
+        )
+    
     def upload_final_video(
         self,
         video_path: str,
@@ -339,6 +372,22 @@ def upload_scene_video(video_path: str, job_id: str, section_num: int) -> Option
     """
     service = get_gcs_storage_service()
     return service.upload_scene_video(video_path, job_id, section_num)
+
+
+def upload_scene_thumbnail(thumbnail_path: str, job_id: str, section_num: int) -> Optional[Dict[str, Any]]:
+    """
+    Convenience function to upload a scene thumbnail.
+    
+    Args:
+        thumbnail_path: Path to the local thumbnail file (PNG)
+        job_id: Job identifier
+        section_num: Section number (1-indexed)
+        
+    Returns:
+        Dictionary with upload results
+    """
+    service = get_gcs_storage_service()
+    return service.upload_scene_thumbnail(thumbnail_path, job_id, section_num)
 
 
 def upload_final_video(video_path: str, job_id: str) -> Optional[Dict[str, Any]]:

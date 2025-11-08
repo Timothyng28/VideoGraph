@@ -288,14 +288,54 @@ Return ONLY the fixed Python code."""
             file_size = section_video.stat().st_size / (1024 * 1024)
             print(f"✓ [Container {section_num}] Video rendered successfully ({file_size:.2f} MB)")
 
+            # Generate thumbnail (first frame)
+            thumbnail_path = None
+            try:
+                print(f"🖼️  [Container {section_num}] Generating thumbnail (first frame)...")
+                thumbnail_file = work_dir / f"section_{section_num}_thumbnail.png"
+                thumbnail_result = subprocess.run(
+                    [
+                        "ffmpeg",
+                        "-i", str(section_video),
+                        "-vframes", "15",  # Extract only first frame
+                        "-q:v", "2",      # High quality
+                        str(thumbnail_file)
+                    ],
+                    capture_output=True,
+                    text=True,
+                    timeout=30
+                )
+                
+                if thumbnail_result.returncode == 0 and thumbnail_file.exists():
+                    thumbnail_size = thumbnail_file.stat().st_size / 1024  # KB
+                    print(f"✓ [Container {section_num}] Thumbnail generated ({thumbnail_size:.2f} KB)")
+                    thumbnail_path = thumbnail_file
+                else:
+                    print(f"⚠️  [Container {section_num}] Thumbnail generation failed (exit code: {thumbnail_result.returncode})")
+                    if thumbnail_result.stderr:
+                        print(f"   stderr: {thumbnail_result.stderr[:500]}")
+            except Exception as e:
+                print(f"⚠️  [Container {section_num}] Thumbnail generation error (non-fatal): {type(e).__name__}: {e}")
+
             # Upload to GCS (individual sections needed by user)
             try:
-                from services.gcs_storage import upload_scene_video
+                from services.gcs_storage import (
+                    upload_scene_thumbnail,
+                    upload_scene_video,
+                )
                 upload_result = upload_scene_video(str(section_video), job_id, section_num)
                 if upload_result and upload_result.get("success"):
                     print(f"✓ [Container {section_num}] Scene video uploaded to GCS: {upload_result.get('public_url')}")
                 else:
                     print(f"⚠️  [Container {section_num}] GCS upload failed: {upload_result.get('error', 'Unknown error') if upload_result else 'No result'}")
+                
+                # Upload thumbnail if it was generated
+                if thumbnail_path and thumbnail_path.exists():
+                    thumbnail_upload_result = upload_scene_thumbnail(str(thumbnail_path), job_id, section_num)
+                    if thumbnail_upload_result and thumbnail_upload_result.get("success"):
+                        print(f"✓ [Container {section_num}] Thumbnail uploaded to GCS: {thumbnail_upload_result.get('public_url')}")
+                    else:
+                        print(f"⚠️  [Container {section_num}] Thumbnail upload failed: {thumbnail_upload_result.get('error', 'Unknown error') if thumbnail_upload_result else 'No result'}")
             except Exception as e:
                 print(f"⚠️  [Container {section_num}] GCS upload error (non-fatal): {type(e).__name__}: {e}")
 

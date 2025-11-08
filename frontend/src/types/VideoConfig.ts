@@ -20,6 +20,8 @@ export interface VideoSegment {
   generatedAt?: string;
   parentSegmentId?: string; // ID of the segment that led to this one
   videoUrl?: string; // URL to the rendered video (set after rendering)
+  thumbnailUrl?: string; // URL to the thumbnail image (first frame)
+  title?: string; // Generated title for this segment
   renderingStatus?: "pending" | "rendering" | "completed" | "failed"; // Status of video rendering
   voiceoverScript?: string; // Combined narration text for this segment
   userAnswer?: string; // Learner's response collected during this segment

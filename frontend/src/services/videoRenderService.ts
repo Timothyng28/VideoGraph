@@ -15,6 +15,8 @@ export interface SectionVoiceover {
 export interface SectionDetail {
   section: number;
   video_url: string;
+  thumbnail_url?: string;
+  title?: string;
   voiceover_script?: string;
 }
 

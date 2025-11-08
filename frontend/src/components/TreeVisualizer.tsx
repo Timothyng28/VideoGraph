@@ -38,6 +38,9 @@ interface TreeVisualizerProps {
  */
 const TreeNode = ({ data }: NodeProps) => {
   const [showLabel, setShowLabel] = useState(false);
+  const [imageError, setImageError] = useState(false);
+  
+  const hasThumbnail = data.thumbnailUrl && !imageError;
   
   return (
     <div 
@@ -49,10 +52,23 @@ const TreeNode = ({ data }: NodeProps) => {
       <Handle type="target" position={Position.Top} style={{ opacity: 0 }} />
       <Handle type="source" position={Position.Bottom} style={{ opacity: 0 }} />
       
+      {/* Show tiny thumbnail if available */}
+      {hasThumbnail && (
+        <div className="absolute inset-0 rounded-full overflow-hidden">
+          <img 
+            src={data.thumbnailUrl} 
+            alt=""
+            className="w-full h-full object-cover"
+            onError={() => setImageError(true)}
+          />
+        </div>
+      )}
+      
       {/* Label tooltip on hover */}
-      {showLabel && data.nodeNumber && (
-        <div className="absolute left-full ml-2 top-1/2 transform -translate-y-1/2 bg-slate-900 text-white text-xs px-2 py-1 rounded whitespace-nowrap z-50 pointer-events-none shadow-lg border border-slate-700">
-          {data.nodeNumber}
+      {showLabel && (data.nodeNumber || data.title) && (
+        <div className="absolute left-full ml-2 top-1/2 transform -translate-y-1/2 bg-slate-900 text-white text-xs px-2 py-1 rounded whitespace-nowrap z-50 pointer-events-none shadow-lg border border-slate-700 max-w-[200px]">
+          <div className="font-semibold">{data.nodeNumber}</div>
+          {data.title && <div className="text-[10px] text-slate-300 mt-0.5 truncate">{data.title}</div>}
         </div>
       )}
     </div>
@@ -175,6 +191,8 @@ export const TreeVisualizer: React.FC<TreeVisualizerProps> = ({
           data: { 
             label: '',
             nodeNumber: nodeNumber,
+            title: node.segment.title,
+            thumbnailUrl: node.segment.thumbnailUrl,
           },
           position: { x: xPos, y: yPosition },
           style: {

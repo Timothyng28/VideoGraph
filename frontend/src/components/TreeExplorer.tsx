@@ -1,34 +1,34 @@
 /**
  * TreeExplorer.tsx
- * 
+ *
  * Full-screen modal for exploring the entire learning tree.
  * Features zoom, pan, drag, and node clicking for navigation.
  */
 
-import { useEffect, useCallback, useState } from 'react';
 import {
-  ReactFlow,
-  Node,
-  Edge,
   Background,
   Controls,
-  MiniMap,
-  MarkerType,
-  NodeMouseHandler,
-  Panel,
-  NodeProps,
+  Edge,
   Handle,
+  MarkerType,
+  MiniMap,
+  Node,
+  NodeMouseHandler,
+  NodeProps,
+  Panel,
   Position,
-} from '@xyflow/react';
-import '@xyflow/react/dist/style.css';
-import './TreeAnimations.css';
-import { LearningTree } from '../types/VideoConfig';
+  ReactFlow,
+} from "@xyflow/react";
+import "@xyflow/react/dist/style.css";
+import { useCallback, useEffect, useState } from "react";
 import {
   getAllNodes,
-  getNodeNumber,
   getCurrentNode,
+  getNodeNumber,
   getPathFromRoot,
-} from '../types/TreeState';
+} from "../types/TreeState";
+import { LearningTree } from "../types/VideoConfig";
+import "./TreeAnimations.css";
 
 interface TreeExplorerProps {
   tree: LearningTree;
@@ -37,39 +37,87 @@ interface TreeExplorerProps {
 }
 
 /**
- * Custom node component for tree explorer with visible label
+ * Custom node component for tree explorer with thumbnail and title
  */
 const ExplorerNode = ({ data }: NodeProps) => {
   const [showTooltip, setShowTooltip] = useState(false);
-  
+  const [imageError, setImageError] = useState(false);
+
+  // Show thumbnail if available, otherwise show colored circle
+  const hasThumbnail = data.thumbnailUrl && !imageError;
+
   return (
-    <div 
-      className="relative flex flex-col items-center"
+    <div
+      className="relative flex flex-col items-center gap-2"
       onMouseEnter={() => setShowTooltip(true)}
       onMouseLeave={() => setShowTooltip(false)}
     >
       {/* Connection handles */}
       <Handle type="target" position={Position.Top} style={{ opacity: 0 }} />
-      
-      {/* Node circle with number */}
-      <div className="w-full h-full flex items-center justify-center font-bold text-xs">
-        {data.nodeNumber}
+
+      {/* Node display - either thumbnail or circle */}
+      <div className="relative">
+        {hasThumbnail ? (
+          // Thumbnail image with node number overlay
+          <div
+            className="relative w-32 h-20 rounded-lg overflow-hidden shadow-lg"
+            style={{
+              border: data.isCurrent
+                ? "3px solid #60a5fa"
+                : `2px solid ${data.borderColor || "#3b82f6"}`,
+              boxShadow: data.isCurrent
+                ? "0 0 30px rgba(59, 130, 246, 0.8), 0 4px 6px -1px rgba(0, 0, 0, 0.1)"
+                : "0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)",
+            }}
+          >
+            <img
+              src={data.thumbnailUrl}
+              alt={data.title || data.topic || "Section thumbnail"}
+              className="w-full h-full object-cover"
+              onError={() => setImageError(true)}
+            />
+            {/* Node number badge on thumbnail */}
+            <div
+              className="absolute top-1 left-1 w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold text-white shadow-md"
+              style={{ backgroundColor: data.nodeColor || "#3b82f6" }}
+            >
+              {data.nodeNumber}
+            </div>
+          </div>
+        ) : (
+          // Fallback to circle with number
+          <div className="w-10 h-10 flex items-center justify-center font-bold text-xs">
+            {data.nodeNumber}
+          </div>
+        )}
       </div>
-      
+
       <Handle type="source" position={Position.Bottom} style={{ opacity: 0 }} />
-      
-      {/* Topic label below node */}
-      {data.topic && (
-        <div className="absolute top-full mt-2 text-sm text-white font-medium max-w-[160px] text-center pointer-events-none bg-slate-900/80 px-2 py-1 rounded">
-          {data.topic}
+
+      {/* Title label below node */}
+      {(data.title || data.topic) && (
+        <div className="max-w-[140px] text-center pointer-events-none">
+          <div className="text-xs text-white font-semibold bg-slate-900/80 px-2 py-1 rounded">
+            {data.title || data.topic}
+          </div>
         </div>
       )}
-      
-      {/* Extended tooltip on hover */}
-      {showTooltip && data.topic && (
-        <div className="absolute left-full ml-3 top-1/2 transform -translate-y-1/2 bg-slate-800 text-white text-sm px-3 py-2 rounded-lg whitespace-nowrap z-50 pointer-events-none shadow-xl border border-slate-600">
-          <div className="font-semibold">{data.nodeNumber}</div>
-          <div className="text-xs text-slate-300 mt-1">{data.topic}</div>
+
+      {/* Extended tooltip on hover with more details */}
+      {showTooltip && (
+        <div className="absolute left-full ml-3 top-1/2 transform -translate-y-1/2 bg-slate-800 text-white text-sm px-3 py-2 rounded-lg z-50 pointer-events-none shadow-xl border border-slate-600 max-w-xs">
+          <div className="font-semibold text-blue-400">{data.nodeNumber}</div>
+          {data.title && (
+            <div className="text-sm font-medium mt-1">{data.title}</div>
+          )}
+          {data.topic && data.topic !== data.title && (
+            <div className="text-xs text-slate-300 mt-1">{data.topic}</div>
+          )}
+          {data.voiceoverScript && (
+            <div className="text-xs text-slate-400 mt-2 max-h-20 overflow-y-auto">
+              {data.voiceoverScript.substring(0, 150)}...
+            </div>
+          )}
         </div>
       )}
     </div>
@@ -87,22 +135,29 @@ const nodeTypes = {
 function calculateTreeLayout(tree: LearningTree) {
   const positions = new Map<string, { x: number; y: number }>();
   const levelWidth = new Map<number, number>();
-  
+
   // Traverse tree level by level
-  function traverse(nodeId: string, level: number, parentX: number, childIndex: number, totalSiblings: number) {
+  function traverse(
+    nodeId: string,
+    level: number,
+    parentX: number,
+    childIndex: number,
+    totalSiblings: number
+  ) {
     const currentWidth = levelWidth.get(level) || 0;
     levelWidth.set(level, currentWidth + 1);
-    
+
     // Calculate x position based on parent and siblings - MUCH MORE SPACING
     const horizontalSpacing = 400; // Wider spacing between siblings
     const verticalSpacing = 250; // More vertical space between levels
-    const offsetX = (childIndex - (totalSiblings - 1) / 2) * horizontalSpacing + parentX;
-    
+    const offsetX =
+      (childIndex - (totalSiblings - 1) / 2) * horizontalSpacing + parentX;
+
     positions.set(nodeId, {
       x: offsetX,
       y: level * verticalSpacing,
     });
-    
+
     // Get children and traverse
     const node = tree.nodes.get(nodeId);
     if (node && node.childIds.length > 0) {
@@ -111,12 +166,12 @@ function calculateTreeLayout(tree: LearningTree) {
       });
     }
   }
-  
+
   // Start from root - centered
   if (tree.rootId) {
     traverse(tree.rootId, 0, 0, 0, 1);
   }
-  
+
   return positions;
 }
 
@@ -130,85 +185,112 @@ export const TreeExplorer: React.FC<TreeExplorerProps> = ({
 }) => {
   const [nodes, setNodes] = useState<Node[]>([]);
   const [edges, setEdges] = useState<Edge[]>([]);
-  
+
   // Build full tree visualization
   useEffect(() => {
     const allNodes = getAllNodes(tree);
     const currentNode = getCurrentNode(tree);
     const positions = calculateTreeLayout(tree);
-    
+
     // Color palette matching the mini view
-    const nodeColors = ['#3b82f6', '#f59e0b', '#ec4899', '#8b5cf6', '#10b981', '#ef4444'];
-    
+    const nodeColors = [
+      "#3b82f6",
+      "#f59e0b",
+      "#ec4899",
+      "#8b5cf6",
+      "#10b981",
+      "#ef4444",
+    ];
+
     const newNodes: Node[] = allNodes.map((treeNode) => {
       const isCurrent = treeNode.id === currentNode?.id;
       const nodeNumber = getNodeNumber(tree, treeNode.id);
       const position = positions.get(treeNode.id) || { x: 0, y: 0 };
-      const isOnCurrentPath = currentNode ? 
-        getPathFromRoot(tree, currentNode.id).some(n => n.id === treeNode.id) : false;
-      
+      const isOnCurrentPath = currentNode
+        ? getPathFromRoot(tree, currentNode.id).some(
+            (n) => n.id === treeNode.id
+          )
+        : false;
+
       // Color based on branch
       const colorIndex = treeNode.branchIndex % nodeColors.length;
-      const nodeColor = isCurrent ? '#3b82f6' : nodeColors[colorIndex];
-      
+      const nodeColor = isCurrent ? "#3b82f6" : nodeColors[colorIndex];
+
+      // Determine if this node has a thumbnail
+      const hasThumbnail = !!treeNode.segment.thumbnailUrl;
+
       return {
         id: treeNode.id,
-        type: 'explorerNode',
+        type: "explorerNode",
         data: {
           nodeNumber: nodeNumber,
           topic: treeNode.segment.topic,
+          title: treeNode.segment.title,
+          thumbnailUrl: treeNode.segment.thumbnailUrl,
+          voiceoverScript: treeNode.segment.voiceoverScript,
+          nodeColor: nodeColor,
+          borderColor: isCurrent ? "#60a5fa" : nodeColor,
+          isCurrent: isCurrent,
         },
         position,
-        sourcePosition: 'bottom' as const,
-        targetPosition: 'top' as const,
+        sourcePosition: "bottom" as const,
+        targetPosition: "top" as const,
         style: {
-          background: nodeColor,
-          color: '#fff',
-          border: isCurrent ? '3px solid #60a5fa' : 'none',
-          borderRadius: '50%',
-          padding: '0',
-          width: '40px',
-          height: '40px',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          boxShadow: isCurrent
-            ? '0 0 30px rgba(59, 130, 246, 0.8)'
-            : '0 2px 8px rgba(0, 0, 0, 0.3)',
-          cursor: 'pointer',
-          transition: 'all 0.2s ease',
+          background: hasThumbnail ? "transparent" : nodeColor,
+          color: "#fff",
+          border: isCurrent && !hasThumbnail ? "3px solid #60a5fa" : "none",
+          borderRadius: hasThumbnail ? "0" : "50%",
+          padding: "0",
+          width: hasThumbnail ? "auto" : "40px",
+          height: hasThumbnail ? "auto" : "40px",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          boxShadow:
+            isCurrent && !hasThumbnail
+              ? "0 0 30px rgba(59, 130, 246, 0.8)"
+              : !hasThumbnail
+              ? "0 2px 8px rgba(0, 0, 0, 0.3)"
+              : "none",
+          cursor: "pointer",
+          transition: "all 0.2s ease",
           opacity: isOnCurrentPath || isCurrent ? 1 : 0.7,
         },
         draggable: true,
       };
     });
-    
+
     const newEdges: Edge[] = [];
-    
+
     allNodes.forEach((treeNode) => {
       if (treeNode.childIds && treeNode.childIds.length > 0) {
-        console.log(`Node ${treeNode.id} has ${treeNode.childIds.length} children:`, treeNode.childIds);
-        
+        console.log(
+          `Node ${treeNode.id} has ${treeNode.childIds.length} children:`,
+          treeNode.childIds
+        );
+
         treeNode.childIds.forEach((childId) => {
           const child = tree.nodes.get(childId);
           if (!child) {
             console.warn(`Child ${childId} not found in tree!`);
             return;
           }
-          
-          const edgeLabel = child.branchLabel || '';
-          
+
+          const edgeLabel = child.branchLabel || "";
+
           // Color based on child's branch
           const colorIndex = (child.branchIndex || 0) % nodeColors.length;
           const edgeColor = nodeColors[colorIndex];
-          
-          console.log(`Creating edge from ${treeNode.id} to ${childId}, color: ${edgeColor}`);
-          
+
+          console.log(
+            `Creating edge from ${treeNode.id} to ${childId}, color: ${edgeColor}`
+          );
+
           newEdges.push({
             id: `edge-${treeNode.id}-to-${childId}`,
             source: treeNode.id,
             target: childId,
-            type: 'smoothstep',
+            type: "smoothstep",
             animated: false,
             style: {
               stroke: edgeColor,
@@ -224,15 +306,20 @@ export const TreeExplorer: React.FC<TreeExplorerProps> = ({
         });
       }
     });
-    
-    console.log('TreeExplorer - Total Nodes:', newNodes.length, 'Total Edges:', newEdges.length);
+
+    console.log(
+      "TreeExplorer - Total Nodes:",
+      newNodes.length,
+      "Total Edges:",
+      newEdges.length
+    );
     if (newEdges.length > 0) {
-      console.log('Sample edges:', newEdges.slice(0, 3));
+      console.log("Sample edges:", newEdges.slice(0, 3));
     }
     setNodes(newNodes);
     setEdges(newEdges);
   }, [tree, tree.currentNodeId, setNodes, setEdges]);
-  
+
   const handleNodeClick: NodeMouseHandler = useCallback(
     (event, node) => {
       event.stopPropagation();
@@ -240,23 +327,23 @@ export const TreeExplorer: React.FC<TreeExplorerProps> = ({
     },
     [onNodeClick]
   );
-  
+
   const handleBackgroundClick = useCallback(() => {
     // Don't close on background click - only via close button
   }, []);
-  
+
   // ESC key handler
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
+      if (e.key === "Escape") {
         onClose();
       }
     };
-    
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
   }, [onClose]);
-  
+
   return (
     <div className="fixed inset-0 z-[100] bg-slate-900/95 backdrop-blur-sm modal-fade">
       <div className="w-full h-full">
@@ -275,23 +362,23 @@ export const TreeExplorer: React.FC<TreeExplorerProps> = ({
           <Background color="#334155" gap={20} size={1} />
           <Controls
             style={{
-              background: '#1e293b',
-              border: '1px solid #475569',
-              borderRadius: '8px',
+              background: "#1e293b",
+              border: "1px solid #475569",
+              borderRadius: "8px",
             }}
           />
           <MiniMap
             style={{
-              background: '#1e293b',
-              border: '1px solid #475569',
-              borderRadius: '8px',
+              background: "#1e293b",
+              border: "1px solid #475569",
+              borderRadius: "8px",
             }}
             nodeColor={(node) => {
               const isCurrent = node.id === tree.currentNodeId;
-              return isCurrent ? '#3b82f6' : '#64748b';
+              return isCurrent ? "#3b82f6" : "#64748b";
             }}
           />
-          
+
           {/* Header panel with title and close button */}
           <Panel position="top-center">
             <div className="bg-slate-800/90 backdrop-blur-sm border border-slate-700 rounded-lg px-6 py-3 shadow-xl">
@@ -308,7 +395,7 @@ export const TreeExplorer: React.FC<TreeExplorerProps> = ({
               </div>
             </div>
           </Panel>
-          
+
           {/* Legend panel */}
           <Panel position="bottom-left">
             <div className="bg-slate-800/90 backdrop-blur-sm border border-slate-700 rounded-lg px-4 py-3 text-sm">
@@ -333,4 +420,3 @@ export const TreeExplorer: React.FC<TreeExplorerProps> = ({
     </div>
   );
 };
-
