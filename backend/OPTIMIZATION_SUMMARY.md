@@ -10,7 +10,64 @@ Reduce video generation pipeline from **1.5 minutes** to under **1 minute**.
 
 ## ✅ Implemented Optimizations
 
-### 🎤 **1. Parallel Audio Pre-Generation (PRIMARY OPTIMIZATION)**
+### 🚀 **1. Fast/Deep Mode Toggle (QUALITY vs SPEED)**
+
+**Impact:** Expected to save **10-20 seconds** in Fast mode
+
+**Changes:**
+- Added `mode` parameter to pipeline: `"deep"` or `"fast"`
+- **Deep Mode** (default): Uses Anthropic Claude Sonnet 4.5 for code generation
+  - Highest quality Manim code
+  - Slower generation (~10-15 seconds per section)
+  - Best for production videos
+  
+- **Fast Mode**: Uses Cerebras Qwen 3 Instruct for code generation
+  - Good quality Manim code
+  - Much faster generation (~3-5 seconds per section)
+  - Great for previews and iterations
+
+**Files Modified:**
+- `backend/modal/dev/generator_logic.py`
+  - Added mode parameter and conditional LLM selection
+  - Logs which mode is being used
+  
+- `backend/modal/dev/api_logic.py`
+  - Added mode to API request body
+  
+- `backend/modal/dev/cli_logic.py`
+  - Added --mode flag to CLI
+
+- `backend/modal/main_video_generator_dev_modular.py`
+  - Updated Modal function signatures to support mode
+
+**Usage:**
+```bash
+# Deep mode (default)
+modal run backend/modal/main_video_generator_dev_modular.py \
+  --prompt "Explain backpropagation"
+
+# Fast mode
+modal run backend/modal/main_video_generator_dev_modular.py \
+  --prompt "Explain backpropagation" \
+  --mode fast
+
+# API
+POST /generate_video_api
+{
+  "topic": "Explain backpropagation",
+  "mode": "fast"  // or "deep"
+}
+```
+
+**Performance Comparison:**
+| Mode | Code Gen LLM | Speed per Section | Quality | Total Time |
+|------|-------------|-------------------|---------|------------|
+| Deep | Anthropic Sonnet 4.5 | 10-15s | ⭐⭐⭐⭐⭐ | ~90s |
+| Fast | Cerebras Qwen 3 | 3-5s | ⭐⭐⭐⭐ | ~50-60s |
+
+---
+
+### 🎤 **2. Parallel Audio Pre-Generation (PRIMARY OPTIMIZATION)**
 
 **Impact:** Expected to save **20-30 seconds**
 
@@ -52,7 +109,7 @@ for section in sections:
 
 ---
 
-### 💾 **2. Skip Individual Volume Commits**
+### 💾 **3. Skip Individual Volume Commits**
 
 **Impact:** Expected to save **5-10 seconds**
 
@@ -72,17 +129,31 @@ for section in sections:
 
 ## 📊 Expected Performance Improvement
 
+### Deep Mode (High Quality)
 | Stage | Before | After | Savings |
 |-------|--------|-------|---------|
 | Plan Generation | 5-10s | 5-10s | ✅ No change |
 | **Audio Generation** | **50-75s** (serial) | **10-15s** (parallel) | **🔥 40-60s** |
-| Code Generation | 10-15s | 10-15s | ✅ No change |
+| Code Generation (Sonnet) | 10-15s | 10-15s | ✅ No change |
 | Video Rendering | 20-30s | 20-30s | ✅ No change |
 | Volume Commits | 10-15s | 2-3s | **⚡ 7-12s** |
 | Concatenation | 3-5s | 3-5s | ✅ No change |
-| **Total** | **90-150s** | **50-68s** | **✨ 40-82s** |
+| **Total (Deep)** | **90-150s** | **50-68s** | **✨ 40-82s** |
 
-**Expected new runtime:** **50-70 seconds** (down from 90-150 seconds)
+### Fast Mode (Good Quality, Faster)
+| Stage | Before | After | Savings |
+|-------|--------|-------|---------|
+| Plan Generation | 5-10s | 5-10s | ✅ No change |
+| **Audio Generation** | **50-75s** (serial) | **10-15s** (parallel) | **🔥 40-60s** |
+| **Code Generation (Qwen)** | **10-15s** (Sonnet) | **3-5s** (Cerebras) | **🚀 7-10s** |
+| Video Rendering | 20-30s | 20-30s | ✅ No change |
+| Volume Commits | 10-15s | 2-3s | **⚡ 7-12s** |
+| Concatenation | 3-5s | 3-5s | ✅ No change |
+| **Total (Fast)** | **90-150s** | **43-58s** | **✨ 47-92s** |
+
+**Expected new runtime:**
+- **Deep mode:** 50-70 seconds (down from 90-150 seconds) - Premium quality
+- **Fast mode:** 40-60 seconds (down from 90-150 seconds) - Good quality, fastest
 
 ---
 
@@ -124,10 +195,10 @@ for section in sections:
 ## 🎯 Future Optimization Opportunities
 
 ### Phase 2 (Medium Effort - Additional 10-20 sec savings)
-1. **Switch to Claude Haiku for Code Generation**
-   - Haiku is 3-5x faster than Sonnet
-   - Slightly lower quality but sufficient
-   - Saves: 5-8 seconds
+1. ✅ **COMPLETED: Fast/Deep Mode Toggle**
+   - Fast mode uses Cerebras Qwen 3 (3-5x faster than Sonnet)
+   - Good quality, great for iteration
+   - Saves: 7-10 seconds
 
 2. **Reduce Rendering Quality**
    - Lower frame rate from 12fps to 10fps
@@ -161,8 +232,14 @@ for section in sections:
 
 1. **Measure Actual Timings:**
    ```bash
+   # Test Deep mode
    time python3 -m modal run backend/modal/main_video_generator_dev_modular.py \
      --prompt "Explain backpropagation in machine learning"
+   
+   # Test Fast mode
+   time python3 -m modal run backend/modal/main_video_generator_dev_modular.py \
+     --prompt "Explain backpropagation in machine learning" \
+     --mode fast
    ```
 
 2. **Monitor ElevenLabs API:**

@@ -148,11 +148,19 @@ def generate_educational_video(
     prompt: str,
     job_id: Optional[str] = None,
     image_context: Optional[str] = None,
-    clerk_user_id: Optional[str] = None
+    clerk_user_id: Optional[str] = None,
+    mode: str = "deep"
 ):
     """
     Generate a complete educational video from a prompt with optional image context.
     Delegates to pure Python logic function.
+    
+    Args:
+        prompt: Topic/description for the video
+        job_id: Optional job ID for tracking
+        image_context: Optional base64-encoded image for visual context
+        clerk_user_id: Optional Clerk user ID for user association
+        mode: Generation mode - "deep" (Anthropic Sonnet) or "fast" (Cerebras Qwen)
     """
     # Pass the render function reference to the logic
     yield from generate_educational_video_logic(
@@ -160,7 +168,8 @@ def generate_educational_video(
         job_id=job_id,
         image_context=image_context,
         clerk_user_id=clerk_user_id,
-        render_single_scene_fn=render_single_scene
+        render_single_scene_fn=render_single_scene,
+        mode=mode
     )
 
 
@@ -178,12 +187,23 @@ async def generate_video_api(item: dict):
 
 
 @app.local_entrypoint()
-def main(prompt: str):
+def main(prompt: str, mode: str = "deep"):
     """
     Local entrypoint for testing.
     Delegates to pure Python logic function.
+    
+    Args:
+        prompt: Topic for the video
+        mode: Generation mode - "deep" or "fast" (default: "deep")
+    
+    Usage:
+        # Deep mode (high quality, slower)
+        modal run backend/modal/main_video_generator_dev_modular.py --prompt "Explain backpropagation"
+        
+        # Fast mode (good quality, faster)
+        modal run backend/modal/main_video_generator_dev_modular.py --prompt "Explain backpropagation" --mode fast
     """
-    main_cli_logic(prompt, generate_educational_video)
+    main_cli_logic(prompt, generate_educational_video, mode)
 
 
 # That's it! The entire app is now modular and maintainable.

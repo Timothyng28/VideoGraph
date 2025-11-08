@@ -20,6 +20,7 @@ async def generate_video_api_logic(item: dict, generate_educational_video_fn):
             "job_id": "optional-job-id",
             "image_context": "optional base64-encoded image",
             "clerk_user_id": "optional clerk user id",
+            "mode": "deep or fast (default: deep)",
             "code_iterations": 1,
             "video_iterations": 1
         }
@@ -39,11 +40,13 @@ async def generate_video_api_logic(item: dict, generate_educational_video_fn):
     job_id = item.get("job_id")
     image_context = item.get("image_context")  # Base64 encoded image
     clerk_user_id = item.get("clerk_user_id")  # Clerk user ID for user association
+    mode = item.get("mode", "deep")  # Generation mode: "deep" or "fast"
 
     # Log what we received
     print(f"📥 Received API request:")
     print(f"   Topic: {prompt}")
     print(f"   Job ID: {job_id}")
+    print(f"   Mode: {mode}")
     print(f"   Has image: {bool(image_context)}")
     print(f"   Clerk User ID: {clerk_user_id}")
 
@@ -54,7 +57,8 @@ async def generate_video_api_logic(item: dict, generate_educational_video_fn):
                 prompt=prompt,
                 job_id=job_id,
                 image_context=image_context,
-                clerk_user_id=clerk_user_id
+                clerk_user_id=clerk_user_id,
+                mode=mode
             ):
                 yield f"data: {json.dumps(update)}\n\n"
         except Exception as e:

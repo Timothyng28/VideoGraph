@@ -8,9 +8,10 @@ import base64
 import hashlib
 import json
 import os
-import requests
 from pathlib import Path
 from typing import Dict, List, Optional
+
+import requests
 from manim_voiceover.services.base import SpeechService
 
 

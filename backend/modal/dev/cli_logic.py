@@ -5,22 +5,24 @@ Allows testing video generation from command line
 """
 
 
-def main_cli_logic(prompt: str, generate_educational_video_fn):
+def main_cli_logic(prompt: str, generate_educational_video_fn, mode: str = "deep"):
     """
     Local entrypoint logic for testing.
 
     Args:
         prompt: Topic for the video
         generate_educational_video_fn: Modal function reference for video generation
+        mode: Generation mode - "deep" or "fast" (default: "deep")
 
     Usage:
-        modal run backend/modal/main_video_generator_dev.py --prompt "Explain photosynthesis"
+        modal run backend/modal/main_video_generator_dev.py --prompt "Explain photosynthesis" --mode fast
     """
     print(f"🎬 Starting educational video generation")
     print(f"   Prompt: {prompt}")
+    print(f"   Mode: {mode.upper()}")
     print()
 
-    for update in generate_educational_video_fn.remote_gen(prompt=prompt):
+    for update in generate_educational_video_fn.remote_gen(prompt=prompt, mode=mode):
         status = update.get("status")
         message = update.get("message", "")
         progress = update.get("progress_percentage", 0)

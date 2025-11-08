@@ -17,7 +17,8 @@ def generate_educational_video_logic(
     job_id: Optional[str] = None,
     image_context: Optional[str] = None,
     clerk_user_id: Optional[str] = None,
-    render_single_scene_fn: Optional[Callable] = None
+    render_single_scene_fn: Optional[Callable] = None,
+    mode: str = "deep"
 ):
     """
     Generate a complete educational video from a prompt with optional image context.
@@ -28,6 +29,9 @@ def generate_educational_video_logic(
         image_context: Optional base64-encoded image to provide visual context
         clerk_user_id: Optional Clerk user ID to associate video with user account
         render_single_scene_fn: Modal function reference for rendering scenes
+        mode: Generation mode - "deep" (slower, higher quality) or "fast" (faster, good quality)
+              - deep: Uses Anthropic Claude Sonnet 4.5 for code generation
+              - fast: Uses Cerebras Qwen 3 for code generation
 
     Yields:
         Progress updates and final video URL
@@ -60,13 +64,18 @@ def generate_educational_video_logic(
         return update_data
 
     try:
+        # Validate mode
+        if mode not in ["deep", "fast"]:
+            mode = "deep"  # Default to deep mode
+        
         print(f"\n{'='*60}")
         print(f"🎬 Starting video generation")
         print(f"   Job ID: {job_id}")
         print(f"   Prompt: {prompt}")
+        print(f"   Mode: {mode.upper()} ({'High Quality' if mode == 'deep' else 'Fast Generation'})")
         print(f"   Working directory: {work_dir}")
         print(f"{'='*60}\n")
-        capture_log(f"Starting video generation - Job: {job_id}, Topic: {prompt}")
+        capture_log(f"Starting video generation - Job: {job_id}, Topic: {prompt}, Mode: {mode}")
 
         # Initialize LLM services
         from services.llm import create_llm_service
@@ -80,14 +89,30 @@ def generate_educational_video_logic(
         print(f"✓ {plan_provider} {plan_model} service initialized\n")
         capture_log(f"{plan_provider} {plan_model} service initialized for plan generation")
 
-        # Anthropic Sonnet 4.5 for code generation (STAGE 2)
-        code_provider = "anthropic"
-        code_model = "claude-sonnet-4-5-20250929"
+        # Code generation service based on mode (STAGE 2)
+        if mode == "deep":
+            # Deep mode: Anthropic Sonnet 4.5 (slower, higher quality)
+            code_provider = "anthropic"
+            code_model = "claude-sonnet-4-5-20250929"
+        else:
+            # Fast mode: Cerebras Qwen 3 (faster, good quality)
+            code_provider = "cerebras"
+            code_model = "qwen-3-235b-a22b-instruct-2507"
 
         print(f"🔧 Initializing {code_provider} {code_model} service for code generation...")
+        print(f"   Mode: {mode.upper()} - {'Premium quality' if mode == 'deep' else 'Fast generation'}")
         code_llm_service = create_llm_service(provider=code_provider, model=code_model)
         print(f"✓ {code_provider} {code_model} service initialized\n")
-        capture_log(f"{code_provider} {code_model} service initialized for code generation")
+        capture_log(f"{code_provider} {code_model} service initialized for code generation (mode: {mode})")
+
+        # ALWAYS initialize Sonnet 4.5 for repairs (even in fast mode)
+        repair_provider = "anthropic"
+        repair_model = "claude-sonnet-4-5-20250929"
+        print(f"🔧 Initializing {repair_provider} {repair_model} service for code repairs...")
+        print(f"   This service will be used for fixing failed code generations")
+        repair_llm_service = create_llm_service(provider=repair_provider, model=repair_model)
+        print(f"✓ {repair_provider} {repair_model} service initialized for repairs\n")
+        capture_log(f"{repair_provider} {repair_model} service initialized for code repairs")
 
         # STAGE 1: Generate Mega Plan with Structured Output
         print(f"\n{'─'*60}")
@@ -348,17 +373,14 @@ def generate_educational_video_logic(
             "job_id": job_id
         })
 
-        # Track spawned render jobs (asyncio already imported above for audio generation)
-        render_function_calls = []
-
-        async def generate_code_async(section_info):
-            """Generate code using async Anthropic API via llm.py service."""
+        async def generate_code_variant_async(section_info, variant_num):
+            """Generate a single code variant for a section."""
             i, section = section_info
             section_num = i + 1
 
             try:
                 print(f"\n{'━'*60}")
-                print(f"📹 [Async {section_num}] Section {section_num}/{len(video_structure)}: {section['section']}")
+                print(f"📹 [Section {section_num} Variant {variant_num}] Generating code variant {variant_num}/3")
                 print(f"{'━'*60}")
 
                 # Check if we have pre-generated audio for this section
@@ -369,7 +391,7 @@ def generate_educational_video_logic(
                     audio_path = audio_info['audio_path']
                     narration_text = audio_info['narration_text']
                     
-                    print(f"🎤 [Async {section_num}] Using pre-generated audio: {Path(audio_path).name}")
+                    print(f"🎤 [Section {section_num} V{variant_num}] Using pre-generated audio: {Path(audio_path).name}")
                     
                     audio_instruction = f"""
 
@@ -402,7 +424,7 @@ The narration text for this section is:
 Use this exact text in the voiceover tracker for proper synchronization.
 """
                 else:
-                    print(f"⚠️  [Async {section_num}] No pre-generated audio, will use TTS during rendering")
+                    print(f"⚠️  [Section {section_num} V{variant_num}] No pre-generated audio, will use TTS during rendering")
                     audio_instruction = "\n\nNote: Generate voiceover using ElevenLabsService as usual."
 
                 section_prompt = f"""{MANIM_META_PROMPT}
@@ -418,105 +440,248 @@ Generate a SINGLE scene for this section only. The scene should be self-containe
                 if image_context:
                     section_prompt += "\n\nNOTE: An image was provided as context for this video. When creating visual demonstrations, consider referencing elements or concepts visible in that image."
 
-                print(f"🤖 [Async {section_num}] Calling {code_provider} {code_model} for code generation (async)...")
-                print(f"   Model: {code_model}")
-                print(f"   Temperature: {TEMP}")
-                print(f"   Max tokens: {MAX_TOKENS}")
-                if audio_info:
-                    print(f"   🎤 Using pre-generated audio: section_{section_num}.mp3")
-                if image_context:
-                    print(f"   🖼️  Image context provided (will be described in text)")
+                print(f"🤖 [Section {section_num} V{variant_num}] Calling {code_provider} {code_model}...")
 
-                # Text-only API call using llm service - ALL happen in parallel!
+                # Use slightly higher temperature for variants to get diversity
+                temp = TEMP if variant_num == 1 else TEMP + 0.1
+                
+                # Text-only API call using llm service
                 manim_code = await code_llm_service.generate_simple_async(
                     prompt=section_prompt,
                     max_tokens=MAX_TOKENS,
-                    temperature=TEMP
+                    temperature=temp
                 )
 
-                print(f"\n🔍 [Async {section_num}] Extracting code from response...")
-                print(f"   Raw response type: {type(manim_code)}")
-                print(f"   Raw response length: {len(manim_code) if manim_code else 0}")
-                print(f"   Raw response preview (first 500 chars): {manim_code[:500] if manim_code else 'None'}...")
-                
-                # Debug: Check for code blocks
-                has_python_block = '```python' in manim_code
-                has_code_block = '```' in manim_code
-                print(f"   Contains ```python block: {has_python_block}")
-                print(f"   Contains ``` block: {has_code_block}")
+                print(f"🔍 [Section {section_num} V{variant_num}] Extracting code from response...")
                 
                 if '```python' in manim_code:
-                    print(f"   Extracting code from ```python block...")
                     manim_code = manim_code.split('```python')[1].split('```')[0].strip()
-                    print(f"   Extracted code length: {len(manim_code)}")
                 elif '```' in manim_code:
-                    print(f"   Extracting code from ``` block...")
                     manim_code = manim_code.split('```')[1].split('```')[0].strip()
-                    print(f"   Extracted code length: {len(manim_code)}")
-                else:
-                    print(f"   No code blocks found, using raw response")
 
                 # Clean the code to remove problematic parameters
                 from services.code_utils import apply_all_manual_fixes, clean_manim_code
 
                 manim_code = clean_manim_code(manim_code)
                 manim_code = apply_all_manual_fixes(manim_code)
-                print(f"✓ [Async {section_num}] Code cleaned and fixed")
+                print(f"✓ [Section {section_num} V{variant_num}] Code cleaned and fixed")
 
-                # IMMEDIATELY spawn render container (don't wait)
-                print(f"🚀 [Async {section_num}] Spawning Modal container for rendering (including ElevenLabs audio)...")
-                render_call = render_single_scene_fn.spawn(section_num, manim_code, str(work_dir), job_id)
-                render_function_calls.append((section_num, render_call))
-
-                print(f"✓ [Async {section_num}] Render container spawned! Continuing to next section...")
-
-                return (section_num, True, None)
+                return (section_num, variant_num, manim_code, None)
 
             except Exception as e:
-                print(f"\n❌ [Async {section_num}] Code generation error: {type(e).__name__}: {e}")
+                print(f"❌ [Section {section_num} V{variant_num}] Code generation error: {type(e).__name__}: {e}")
                 import traceback
                 print(traceback.format_exc())
-                return (section_num, None, None, str(e))
+                return (section_num, variant_num, None, str(e))
 
-        async def generate_all_parallel():
-            """Generate ALL codes in parallel using asyncio.gather."""
-            print(f"🎯 Starting FULLY PARALLEL code generation for {len(video_structure)} sections...")
-            tasks = [generate_code_async((i, section)) for i, section in enumerate(video_structure)]
-            results = await asyncio.gather(*tasks, return_exceptions=True)
-            return results
-
-        # Execute ALL code generation calls in parallel
-        generation_results = asyncio.run(generate_all_parallel())
-
-        print(f"\n✓ Code generation complete: {len([r for r in generation_results if r[1]])} / {len(video_structure)} sections spawned renders")
-
-        # Now wait for all render containers to complete (in parallel)
-        print(f"\n{'─'*60}")
-        print(f"⏳ Waiting for {len(render_function_calls)} render containers to complete...")
-        print(f"   (Audio generation with ElevenLabs happening in parallel containers)")
-        print(f"{'─'*60}\n")
-
-        # Wait for ALL renders in parallel using asyncio
-        async def wait_for_all_renders():
-            """Wait for all render containers in parallel."""
-            async def get_result(section_num, render_call):
+        async def try_render_with_fallback(section_num, code_variants, fix_attempt=0):
+            """
+            Try rendering with code variants, falling back to next variant on failure.
+            If all fail, apply fixes and retry (up to 3 fix attempts total).
+            
+            Args:
+                section_num: Section number
+                code_variants: List of (variant_num, code) tuples
+                fix_attempt: Current fix attempt number (0-3)
+            
+            Returns:
+                (success, video_path, error) tuple
+            """
+            import concurrent.futures
+            
+            MAX_FIX_ATTEMPTS = 3
+            
+            print(f"\n{'─'*60}")
+            print(f"🎬 [Section {section_num}] Trying {len(code_variants)} code variants (fix attempt {fix_attempt})")
+            print(f"{'─'*60}")
+            
+            # Try each variant sequentially until one succeeds
+            for variant_num, code in code_variants:
+                if code is None:
+                    continue
+                    
                 try:
-                    # Modal's function_call.get() is blocking, so run in thread pool
-                    import concurrent.futures
+                    print(f"🚀 [Section {section_num} V{variant_num}] Spawning render container...")
+                    render_call = render_single_scene_fn.spawn(section_num, code, str(work_dir), job_id)
+                    
+                    # Wait for render to complete
+                    print(f"⏳ [Section {section_num} V{variant_num}] Waiting for render...")
                     with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
                         future = executor.submit(render_call.get, 900)  # 15 min timeout
                         result = await asyncio.get_event_loop().run_in_executor(None, future.result)
-                    print(f"✓ Section {section_num} render completed")
-                    return result
+                    
+                    result_section_num, video_path, error = result
+                    
+                    if video_path and not error:
+                        print(f"✅ [Section {section_num} V{variant_num}] Render succeeded!")
+                        return (True, video_path, None)
+                    else:
+                        print(f"❌ [Section {section_num} V{variant_num}] Render failed: {error}")
+                        # Continue to next variant
+                        
                 except Exception as e:
-                    print(f"❌ Section {section_num} render failed: {e}")
-                    return (section_num, None, str(e))
+                    print(f"❌ [Section {section_num} V{variant_num}] Render exception: {type(e).__name__}: {e}")
+                    # Continue to next variant
+            
+            # All variants failed - try applying fixes if we haven't exceeded max attempts
+            if fix_attempt < MAX_FIX_ATTEMPTS:
+                print(f"\n⚠️  [Section {section_num}] All {len(code_variants)} variants failed. Applying fixes (attempt {fix_attempt + 1}/{MAX_FIX_ATTEMPTS})...")
+                
+                # Apply fixes to all variants in parallel using Sonnet 4.5
+                async def apply_fix_async(variant_code_tuple, last_error=None):
+                    variant_num, code = variant_code_tuple
+                    if code is None:
+                        return (variant_num, None)
+                    
+                    try:
+                        print(f"🔧 [Section {section_num} V{variant_num}] Applying LLM-based fixes with Sonnet 4.5...")
+                        from services.code_utils import (
+                            apply_all_manual_fixes,
+                            clean_manim_code,
+                        )
+                        
+                        # First, try rule-based fixes
+                        fixed_code = clean_manim_code(code)
+                        fixed_code = apply_all_manual_fixes(fixed_code)
+                        
+                        # Additional aggressive fixes for common errors
+                        import re
+                        fixed_code = re.sub(r',\s*stroke_width\s*=\s*[^,\)]+', '', fixed_code)
+                        fixed_code = re.sub(r',\s*fill_opacity\s*=\s*[^,\)]+', '', fixed_code)
+                        
+                        # Then use Sonnet 4.5 to regenerate/fix the code based on errors
+                        repair_prompt = f"""The following Manim code failed to render. Please fix all errors and return ONLY the corrected Python code.
 
-            tasks = [get_result(section_num, render_call) for section_num, render_call in render_function_calls]
-            results = await asyncio.gather(*tasks, return_exceptions=True)
+ORIGINAL CODE:
+```python
+{code}
+```
+
+AFTER RULE-BASED FIXES:
+```python
+{fixed_code}
+```
+
+ERROR CONTEXT:
+The code failed during rendering. Common issues include:
+- Incorrect parameter names or values
+- Missing imports
+- Syntax errors
+- Invalid Manim API usage
+
+Please generate a corrected version that:
+1. Fixes all syntax and runtime errors
+2. Uses only valid Manim parameters and methods
+3. Maintains the original intent and structure
+4. Returns ONLY the Python code without explanations
+
+Generate the fixed code now:"""
+
+                        print(f"🤖 [Section {section_num} V{variant_num}] Calling Sonnet 4.5 for intelligent repair...")
+                        
+                        # Use repair_llm_service (Sonnet 4.5) for fixing
+                        repaired_code = await repair_llm_service.generate_simple_async(
+                            prompt=repair_prompt,
+                            max_tokens=MAX_TOKENS,
+                            temperature=0.3  # Lower temperature for more precise fixes
+                        )
+                        
+                        # Extract code from response
+                        if '```python' in repaired_code:
+                            repaired_code = repaired_code.split('```python')[1].split('```')[0].strip()
+                        elif '```' in repaired_code:
+                            repaired_code = repaired_code.split('```')[1].split('```')[0].strip()
+                        
+                        # Apply final cleanup
+                        repaired_code = clean_manim_code(repaired_code)
+                        repaired_code = apply_all_manual_fixes(repaired_code)
+                        
+                        print(f"✅ [Section {section_num} V{variant_num}] Sonnet 4.5 repair complete")
+                        return (variant_num, repaired_code)
+                    except Exception as e:
+                        print(f"❌ [Section {section_num} V{variant_num}] Repair failed: {e}")
+                        import traceback
+                        print(traceback.format_exc())
+                        return (variant_num, None)
+                
+                fix_tasks = [apply_fix_async(vc) for vc in code_variants]
+                fixed_variants = await asyncio.gather(*fix_tasks)
+                
+                # Filter out None results
+                fixed_variants = [(vn, code) for vn, code in fixed_variants if code is not None]
+                
+                if fixed_variants:
+                    print(f"✓ [Section {section_num}] Applied fixes to {len(fixed_variants)} variants. Retrying renders...")
+                    # Recursively try rendering with fixed variants
+                    return await try_render_with_fallback(section_num, fixed_variants, fix_attempt + 1)
+                else:
+                    print(f"❌ [Section {section_num}] No variants could be fixed")
+                    return (False, None, "All variants and fix attempts failed")
+            else:
+                print(f"❌ [Section {section_num}] Max fix attempts (3) reached")
+                return (False, None, f"All {len(code_variants)} variants failed after 3 fix attempts")
+
+        async def process_section_with_variants(section_info):
+            """
+            Process a single section: generate 3 code variants, try rendering with fallback.
+            """
+            i, section = section_info
+            section_num = i + 1
+            
+            try:
+                print(f"\n{'='*60}")
+                print(f"🎬 SECTION {section_num}/{len(video_structure)}: {section['section']}")
+                print(f"{'='*60}")
+                
+                # Generate 3 code variants in parallel
+                print(f"🤖 [Section {section_num}] Generating 3 code variants in parallel...")
+                variant_tasks = [
+                    generate_code_variant_async(section_info, 1),
+                    generate_code_variant_async(section_info, 2),
+                    generate_code_variant_async(section_info, 3)
+                ]
+                variant_results = await asyncio.gather(*variant_tasks, return_exceptions=True)
+                
+                # Extract successful code variants
+                code_variants = []
+                for result in variant_results:
+                    if isinstance(result, tuple) and len(result) == 4:
+                        s_num, v_num, code, error = result
+                        if code and not error:
+                            code_variants.append((v_num, code))
+                            print(f"✓ [Section {section_num} V{v_num}] Generated successfully")
+                        else:
+                            print(f"❌ [Section {section_num} V{v_num}] Generation failed: {error}")
+                
+                if not code_variants:
+                    print(f"❌ [Section {section_num}] All 3 variants failed to generate")
+                    return (section_num, None, "All code generation attempts failed")
+                
+                print(f"✓ [Section {section_num}] Generated {len(code_variants)}/3 variants successfully")
+                
+                # Try rendering with fallback logic
+                success, video_path, error = await try_render_with_fallback(section_num, code_variants, fix_attempt=0)
+                
+                if success:
+                    return (section_num, video_path, None)
+                else:
+                    return (section_num, None, error)
+                    
+            except Exception as e:
+                print(f"❌ [Section {section_num}] Fatal error: {type(e).__name__}: {e}")
+                import traceback
+                print(traceback.format_exc())
+                return (section_num, None, str(e))
+
+        # Process all sections in parallel
+        async def process_all_sections():
+            """Process all sections with variants and retries."""
+            print(f"🎯 Starting parallel processing of {len(video_structure)} sections (3 variants each)...")
+            section_tasks = [process_section_with_variants((i, section)) for i, section in enumerate(video_structure)]
+            results = await asyncio.gather(*section_tasks)
             return results
-
-        render_results = asyncio.run(wait_for_all_renders())
+        
+        render_results = asyncio.run(process_all_sections())
         print(f"\n✓ All rendering containers completed")
 
         # Reload volume to see files written by render containers
