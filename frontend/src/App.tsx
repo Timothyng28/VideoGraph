@@ -334,6 +334,8 @@ export const App: React.FC = () => {
             navigateToNode,
             handleQuestionBranch,
             goToSegment,
+            activeGenerations,
+            removeGenerationRequest,
           }) => {
             // Check if current node is a leaf (no children) - this means it's the last segment
             const isLastSegment =
@@ -526,6 +528,9 @@ export const App: React.FC = () => {
                       onReset={handleReset}
                       onAskQuestion={handleQuestionBranch}
                       currentNodeNumber={currentNodeNumber}
+                      activeGenerations={activeGenerations}
+                      onNavigateToGeneration={navigateToNode}
+                      onDismissGeneration={removeGenerationRequest}
                     />
                   </div>
                 </div>

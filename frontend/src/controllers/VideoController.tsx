@@ -33,6 +33,20 @@ import { generateVideoScenes, GenerationProgress, SectionDetail } from '../servi
 import { analyzeQuestion } from '../services/questionAnalysisService';
 
 /**
+ * Generation request for parallel processing
+ */
+export interface GenerationRequest {
+  id: string;
+  type: 'question' | 'topic' | 'next';
+  prompt: string;
+  status: 'pending' | 'generating' | 'complete' | 'error';
+  parentNodeId: string | null;
+  resultNodeId: string | null;
+  error?: string;
+  timestamp: number;
+}
+
+/**
  * Props for VideoController render function
  */
 export interface VideoControllerState {
@@ -54,6 +68,10 @@ export interface VideoControllerState {
   
   // Generation progress (for SSE updates)
   generationProgress?: GenerationProgress;
+  
+  // Active generation requests (parallel processing)
+  activeGenerations: GenerationRequest[];
+  removeGenerationRequest: (requestId: string) => void;
   
   // Actions
   handleAnswer: (answer: string) => Promise<void>;
@@ -162,10 +180,52 @@ export const VideoController: React.FC<VideoControllerProps> = ({
   // Generation progress
   const [generationProgress, setGenerationProgress] = useState<GenerationProgress | undefined>();
   
+  // Parallel generation tracking
+  const [activeGenerations, setActiveGenerations] = useState<GenerationRequest[]>([]);
+  const [mostRecentGenerationId, setMostRecentGenerationId] = useState<string | null>(null);
+  
   // Get current segment from tree
   const currentNode = getCurrentNode(session.tree);
   const currentSegment = currentNode?.segment || null;
   const currentNodeNumber = currentNode ? getNodeNumber(session.tree, currentNode.id) : '';
+  
+  /**
+   * Helper: Create a new generation request
+   */
+  const createGenerationRequest = (
+    type: 'question' | 'topic' | 'next',
+    prompt: string,
+    parentNodeId: string | null
+  ): GenerationRequest => {
+    return {
+      id: `gen_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      type,
+      prompt,
+      status: 'pending',
+      parentNodeId,
+      resultNodeId: null,
+      timestamp: Date.now(),
+    };
+  };
+  
+  /**
+   * Helper: Update a generation request
+   */
+  const updateGenerationRequest = (
+    requestId: string,
+    updates: Partial<GenerationRequest>
+  ) => {
+    setActiveGenerations(prev => 
+      prev.map(req => req.id === requestId ? { ...req, ...updates } : req)
+    );
+  };
+  
+  /**
+   * Helper: Remove a generation request
+   */
+  const removeGenerationRequest = useCallback((requestId: string) => {
+    setActiveGenerations(prev => prev.filter(req => req.id !== requestId));
+  }, []);
   
   /**
    * Generate the first segment when component mounts
@@ -395,14 +455,23 @@ export const VideoController: React.FC<VideoControllerProps> = ({
   /**
    * Request a completely new topic (pivot)
    * Creates a new independent root tree instead of branching
+   * Now supports parallel generation
    */
   const requestNewTopic = useCallback(
     async (newTopic: string) => {
-      setIsGenerating(true);
-      setError(null);
-      setGenerationProgress(undefined);
+      // Create generation request
+      const request = createGenerationRequest('topic', newTopic, null);
+      
+      // Add to active generations and mark as most recent
+      setActiveGenerations(prev => [...prev, request]);
+      setMostRecentGenerationId(request.id);
+      
+      console.log(`[${request.id}] Starting new topic generation: ${newTopic}`);
       
       try {
+        // Update status to generating
+        updateGenerationRequest(request.id, { status: 'generating' });
+        
         // Create fresh context for new topic
         const newContext = updateContext(session.context, {
           previousTopic: newTopic,
@@ -411,8 +480,7 @@ export const VideoController: React.FC<VideoControllerProps> = ({
         });
         
         const result = await generateVideoScenes(newTopic, (progress) => {
-          setGenerationProgress(progress);
-          console.log('Generation progress for new topic:', progress);
+          console.log(`[${request.id}] Generation progress:`, progress);
         });
         
         if (result.success && result.sections && result.sections.length > 0) {
@@ -466,8 +534,22 @@ export const VideoController: React.FC<VideoControllerProps> = ({
             currentBranchNodeId = newNode.id;
           }
           
-          // Navigate to the new root node
-          navigateToNodeHelper(session.tree, newRootNode.id);
+          // Update request with result
+          updateGenerationRequest(request.id, { 
+            status: 'complete',
+            resultNodeId: newRootNode.id
+          });
+          
+          // Only navigate if this is still the most recent request
+          setMostRecentGenerationId(current => {
+            if (current === request.id) {
+              console.log(`[${request.id}] Most recent request - navigating to new topic`);
+              navigateToNodeHelper(session.tree, newRootNode.id);
+            } else {
+              console.log(`[${request.id}] Not most recent (current: ${current}) - skipping navigation`);
+            }
+            return current;
+          });
           
           const updatedSession = {
             ...session,
@@ -476,23 +558,24 @@ export const VideoController: React.FC<VideoControllerProps> = ({
           };
           
           setSession(updatedSession);
-          
-          // Save complete session to localStorage
           saveVideoSession(updatedSession);
           
-          console.log(`Created new root tree with ${newSegments.length} video segments for topic: ${newTopic}`);
+          console.log(`[${request.id}] Created new root tree with ${newSegments.length} video segments for topic: ${newTopic}`);
         } else {
           const errorMsg = result.error || 'Failed to generate video scenes for new topic';
-          setError(errorMsg);
-          onError?.(errorMsg);
+          updateGenerationRequest(request.id, { 
+            status: 'error',
+            error: errorMsg
+          });
+          console.error(`[${request.id}] Error:`, errorMsg);
         }
       } catch (err) {
         const errorMsg = err instanceof Error ? err.message : 'Unknown error occurred';
-        setError(errorMsg);
-        onError?.(errorMsg);
-      } finally {
-        setIsGenerating(false);
-        setGenerationProgress(undefined);
+        updateGenerationRequest(request.id, { 
+          status: 'error',
+          error: errorMsg
+        });
+        console.error(`[${request.id}] Error:`, err);
       }
     },
     [session, onError]
@@ -514,6 +597,7 @@ export const VideoController: React.FC<VideoControllerProps> = ({
   
   /**
    * Handle user question and create a branch with answer videos
+   * Now supports parallel generation
    */
   const handleQuestionBranch = useCallback(async (question: string) => {
     if (!currentNode || !currentSegment) {
@@ -521,12 +605,20 @@ export const VideoController: React.FC<VideoControllerProps> = ({
       return;
     }
     
-    setIsGenerating(true);
-    setError(null);
-    setGenerationProgress(undefined);
+    // Create generation request
+    const request = createGenerationRequest('question', question, currentNode.id);
+    
+    // Add to active generations and mark as most recent
+    setActiveGenerations(prev => [...prev, request]);
+    setMostRecentGenerationId(request.id);
+    
+    console.log(`[${request.id}] Starting question branch: ${question}`);
     
     try {
-      console.log('Analyzing question:', question);
+      // Update status to generating
+      updateGenerationRequest(request.id, { status: 'generating' });
+      
+      console.log(`[${request.id}] Analyzing question...`);
       
       // Step 1: Analyze the question to get learning phases
       const analysisResult = await analyzeQuestion(
@@ -537,15 +629,17 @@ export const VideoController: React.FC<VideoControllerProps> = ({
       
       if (!analysisResult.success || !analysisResult.phases) {
         const errorMsg = analysisResult.error || 'Failed to analyze question';
-        setError(errorMsg);
-        onError?.(errorMsg);
-        setIsGenerating(false);
+        updateGenerationRequest(request.id, { 
+          status: 'error',
+          error: errorMsg
+        });
+        console.error(`[${request.id}] Error:`, errorMsg);
         return;
       }
       
       const { phases } = analysisResult;
-      console.log(`Question analysis complete: ${phases.length} videos needed`);
-      console.log('Phases:', phases.map(p => p.sub_topic).join(', '));
+      console.log(`[${request.id}] Question analysis complete: ${phases.length} videos needed`);
+      console.log(`[${request.id}] Phases:`, phases.map(p => p.sub_topic).join(', '));
       
       // Step 2: Generate videos for each phase
       let firstNewNodeId: string | null = null;
@@ -556,26 +650,14 @@ export const VideoController: React.FC<VideoControllerProps> = ({
       
       for (let i = 0; i < phases.length; i++) {
         const phase = phases[i];
-        console.log(`Generating video ${i + 1}/${phases.length}: ${phase.sub_topic}`);
-        
-        setGenerationProgress({
-          status: 'processing',
-          stage: i + 1,
-          stage_name: phase.sub_topic,
-          progress_percentage: Math.round(((i + 1) / phases.length) * 100),
-          message: `Generating video for: ${phase.sub_topic}`,
-        });
+        console.log(`[${request.id}] Generating video ${i + 1}/${phases.length}: ${phase.sub_topic}`);
         
         // Build contextual topic that includes parent topic and original question
         const contextualTopic = `${currentSegment.topic} - ${phase.sub_topic}. Context: User asked "${question}"`;
         
         // Generate video for this phase using Modal backend with full context
         const result = await generateVideoScenes(contextualTopic, (progress) => {
-          setGenerationProgress({
-            ...progress,
-            stage: i + 1,
-            stage_name: phase.sub_topic,
-          });
+          console.log(`[${request.id}] Video ${i + 1} progress:`, progress);
         });
         
         if (result.success && result.sections && result.sections.length > 0) {
@@ -602,10 +684,10 @@ export const VideoController: React.FC<VideoControllerProps> = ({
           };
           
           generatedSegments.push(newSegment);
-          console.log(`✓ Generated video ${i + 1}: ${phase.sub_topic}`);
+          console.log(`[${request.id}] ✓ Generated video ${i + 1}: ${phase.sub_topic}`);
         } else {
           const errorMsg = result.error || `Failed to generate video for: ${phase.sub_topic}`;
-          console.error(errorMsg);
+          console.error(`[${request.id}] Error generating video ${i + 1}:`, errorMsg);
           // Continue with remaining phases even if one fails
         }
       }
@@ -628,11 +710,25 @@ export const VideoController: React.FC<VideoControllerProps> = ({
           
           // For linear chain: next phase branches from this node
           currentParentNodeId = newNode.id;
-          console.log(`✓ Added node ${i + 1} to tree: ${phase.sub_topic}`);
+          console.log(`[${request.id}] ✓ Added node ${i + 1} to tree: ${phase.sub_topic}`);
         }
         
-        // Navigate to first video in the branch
-        navigateToNodeHelper(session.tree, firstNewNodeId!);
+        // Update request with result
+        updateGenerationRequest(request.id, { 
+          status: 'complete',
+          resultNodeId: firstNewNodeId!
+        });
+        
+        // Only navigate if this is still the most recent request
+        setMostRecentGenerationId(current => {
+          if (current === request.id) {
+            console.log(`[${request.id}] Most recent request - navigating to question branch`);
+            navigateToNodeHelper(session.tree, firstNewNodeId!);
+          } else {
+            console.log(`[${request.id}] Not most recent (current: ${current}) - skipping navigation`);
+          }
+          return current;
+        });
         
         // Create updated session and save
         const updatedSession = { 
@@ -642,20 +738,23 @@ export const VideoController: React.FC<VideoControllerProps> = ({
         setSession(updatedSession);
         saveVideoSession(updatedSession);
         
-        console.log(`✓ Question branch created with ${generatedSegments.length} videos`);
-        console.log(`Navigated to first video: ${phases[0].sub_topic}`);
+        console.log(`[${request.id}] ✓ Question branch created with ${generatedSegments.length} videos`);
       } else {
-        setError('Failed to create any videos for the question');
+        const errorMsg = 'Failed to create any videos for the question';
+        updateGenerationRequest(request.id, { 
+          status: 'error',
+          error: errorMsg
+        });
+        console.error(`[${request.id}] Error:`, errorMsg);
       }
       
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : 'Unknown error occurred';
-      setError(errorMsg);
-      onError?.(errorMsg);
-      console.error('Question branch error:', err);
-    } finally {
-      setIsGenerating(false);
-      setGenerationProgress(undefined);
+      updateGenerationRequest(request.id, { 
+        status: 'error',
+        error: errorMsg
+      });
+      console.error(`[${request.id}] Error:`, err);
     }
   }, [currentNode, currentSegment, session, onError]);
   
@@ -678,6 +777,8 @@ export const VideoController: React.FC<VideoControllerProps> = ({
     isEvaluating,
     error,
     generationProgress,
+    activeGenerations,
+    removeGenerationRequest,
     handleAnswer,
     requestNextSegment,
     requestNewTopic,

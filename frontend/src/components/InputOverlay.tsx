@@ -9,6 +9,8 @@
 
 import { useState, FormEvent } from "react";
 import { BranchButton } from "./BranchButton";
+import { GenerationCard } from "./GenerationCard";
+import { GenerationRequest } from "../controllers/VideoController";
 
 interface InputOverlayProps {
   hasQuestion: boolean;
@@ -21,6 +23,9 @@ interface InputOverlayProps {
   onReset: () => void;
   onAskQuestion: (question: string) => void;
   currentNodeNumber: string;
+  activeGenerations: GenerationRequest[];
+  onNavigateToGeneration?: (nodeId: string) => void;
+  onDismissGeneration?: (requestId: string) => void;
 }
 
 export const InputOverlay: React.FC<InputOverlayProps> = ({
@@ -34,6 +39,9 @@ export const InputOverlay: React.FC<InputOverlayProps> = ({
   onReset,
   onAskQuestion,
   currentNodeNumber,
+  activeGenerations,
+  onNavigateToGeneration,
+  onDismissGeneration,
 }) => {
   const [input, setInput] = useState("");
   const [showNewTopicInput, setShowNewTopicInput] = useState(false);
@@ -58,26 +66,28 @@ export const InputOverlay: React.FC<InputOverlayProps> = ({
     }
   };
 
-  // Show loading state
-  if (isGenerating || isEvaluating) {
-    return (
-      <div className="p-4">
-        <div className="bg-slate-700/50 border border-slate-600 rounded-xl px-6 py-5">
-          <div className="flex items-center gap-3">
-            <div className="animate-spin rounded-full h-6 w-6 border-2 border-blue-500 border-t-transparent" />
-            <span className="text-white text-sm">
-              {isEvaluating ? 'Evaluating your answer...' : 'Generating next segment...'}
-            </span>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
   // New topic input mode
   if (showNewTopicInput) {
     return (
-      <div className="p-4">
+      <div className="p-4 space-y-3">
+        {/* Active Generation Cards */}
+        {activeGenerations.length > 0 && (
+          <div className="space-y-2">
+            <h4 className="text-xs font-semibold text-slate-400 uppercase tracking-wide px-1">
+              Active Generations ({activeGenerations.length})
+            </h4>
+            {activeGenerations.map((gen) => (
+              <GenerationCard
+                key={gen.id}
+                request={gen}
+                onNavigate={onNavigateToGeneration}
+                onDismiss={onDismissGeneration}
+              />
+            ))}
+          </div>
+        )}
+
+        {/* New Topic Input Form */}
         <div className="bg-slate-700/50 border border-slate-600 rounded-xl p-5">
           <div className="mb-4">
             <h3 className="text-white text-base font-semibold mb-2">
@@ -119,7 +129,25 @@ export const InputOverlay: React.FC<InputOverlayProps> = ({
   // Question mode - segment has a question
   if (hasQuestion && questionText) {
     return (
-      <div className="p-4">
+      <div className="p-4 space-y-3">
+        {/* Active Generation Cards */}
+        {activeGenerations.length > 0 && (
+          <div className="space-y-2">
+            <h4 className="text-xs font-semibold text-slate-400 uppercase tracking-wide px-1">
+              Active Generations ({activeGenerations.length})
+            </h4>
+            {activeGenerations.map((gen) => (
+              <GenerationCard
+                key={gen.id}
+                request={gen}
+                onNavigate={onNavigateToGeneration}
+                onDismiss={onDismissGeneration}
+              />
+            ))}
+          </div>
+        )}
+
+        {/* Question Input Form */}
         <div className="bg-slate-700/50 border border-slate-600 rounded-xl p-5">
           {/* Question */}
           <div className="mb-4">
@@ -155,7 +183,7 @@ export const InputOverlay: React.FC<InputOverlayProps> = ({
             {/* Branch Button */}
             <BranchButton
               onAskQuestion={onAskQuestion}
-              disabled={isEvaluating || isGenerating}
+              disabled={isEvaluating}
             />
             
             <button
@@ -172,13 +200,31 @@ export const InputOverlay: React.FC<InputOverlayProps> = ({
 
   // No question mode - show continue/new topic options
   return (
-    <div className="p-4">
+    <div className="p-4 space-y-3">
+      {/* Active Generation Cards */}
+      {activeGenerations.length > 0 && (
+        <div className="space-y-2">
+          <h4 className="text-xs font-semibold text-slate-400 uppercase tracking-wide px-1">
+            Active Generations ({activeGenerations.length})
+          </h4>
+          {activeGenerations.map((gen) => (
+            <GenerationCard
+              key={gen.id}
+              request={gen}
+              onNavigate={onNavigateToGeneration}
+              onDismiss={onDismissGeneration}
+            />
+          ))}
+        </div>
+      )}
+
+      {/* Action Buttons */}
       <div className="bg-slate-700/50 border border-slate-600 rounded-xl p-5">
         <div className="flex flex-col gap-3">
           {/* Branch Button */}
           <BranchButton
             onAskQuestion={onAskQuestion}
-            disabled={isGenerating}
+            disabled={false}
           />
           
           <button
