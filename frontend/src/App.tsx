@@ -7,17 +7,22 @@
  * 2. Video Flow - Continuous video segments with VideoController
  */
 
-import { useEffect, useRef, useState, useCallback } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { ClosingQuestionOverlay } from "./components/ClosingQuestionOverlay";
 import { ErrorDisplay } from "./components/ErrorDisplay";
 import { InputOverlay } from "./components/InputOverlay";
 import { LandingPage } from "./components/LandingPage";
 import { LoadingSpinner } from "./components/LoadingSpinner";
 import { TreeExplorer } from "./components/TreeExplorer";
 import { TreeVisualizer } from "./components/TreeVisualizer";
-import { ClosingQuestionOverlay } from "./components/ClosingQuestionOverlay";
 import { VideoController } from "./controllers/VideoController";
-import { getNextNode, getPreviousNode } from "./types/TreeState";
 import { generateClosingQuestion } from "./services/llmService";
+import {
+  getAllNodes,
+  getChildren,
+  getNextNode,
+  getPreviousNode,
+} from "./types/TreeState";
 import { ClosingQuestionPayload, VideoSession } from "./types/VideoConfig";
 
 /**
@@ -37,24 +42,27 @@ export const App: React.FC = () => {
   // Reference to the video element for programmatic control
   const videoRef = useRef<HTMLVideoElement>(null);
   const closingPayloadRef = useRef<ClosingQuestionPayload | null>(null);
-  
+
   // Track when segment changes to restart playback
   const [segmentKey, setSegmentKey] = useState(0);
-  
+
   // Closing question state
   const [closingQuestion, setClosingQuestion] = useState<string | null>(null);
-  const [closingQuestionStatus, setClosingQuestionStatus] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle');
-  const [closingQuestionError, setClosingQuestionError] = useState<string>('');
-  const [closingQuestionAnswer, setClosingQuestionAnswer] = useState<string>('');
+  const [closingQuestionStatus, setClosingQuestionStatus] = useState<
+    "idle" | "loading" | "ready" | "error"
+  >("idle");
+  const [closingQuestionError, setClosingQuestionError] = useState<string>("");
+  const [closingQuestionAnswer, setClosingQuestionAnswer] =
+    useState<string>("");
 
   const resetClosingQuestionState = useCallback(() => {
     setClosingQuestion(null);
-    setClosingQuestionStatus('idle');
-    setClosingQuestionError('');
-    setClosingQuestionAnswer('');
+    setClosingQuestionStatus("idle");
+    setClosingQuestionError("");
+    setClosingQuestionAnswer("");
     closingPayloadRef.current = null;
   }, []);
-  
+
   // ===== TEST MODE - EASILY REMOVABLE =====
   const [isTestMode, setIsTestMode] = useState(false);
   // ===== END TEST MODE =====
@@ -121,83 +129,101 @@ export const App: React.FC = () => {
     setIsTestMode(false); // Reset test mode
   };
 
-  const executeClosingQuestionRequest = useCallback(async (payload: ClosingQuestionPayload) => {
-    setClosingQuestionStatus('loading');
-    setClosingQuestion(null);
-    setClosingQuestionError('');
+  const executeClosingQuestionRequest = useCallback(
+    async (payload: ClosingQuestionPayload) => {
+      setClosingQuestionStatus("loading");
+      setClosingQuestion(null);
+      setClosingQuestionError("");
 
-    try {
-      console.log('Requesting closing question with payload:', payload);
-      const response = await generateClosingQuestion(payload);
-      console.log('Closing question response:', response);
-      if (response.success && response.question) {
-        setClosingQuestion(response.question);
-        setClosingQuestionStatus('ready');
-      } else {
-        setClosingQuestionStatus('error');
-        setClosingQuestionError(response.error || 'Unable to generate closing question');
+      try {
+        console.log("Requesting closing question with payload:", payload);
+        const response = await generateClosingQuestion(payload);
+        console.log("Closing question response:", response);
+        if (response.success && response.question) {
+          setClosingQuestion(response.question);
+          setClosingQuestionStatus("ready");
+        } else {
+          setClosingQuestionStatus("error");
+          setClosingQuestionError(
+            response.error || "Unable to generate closing question"
+          );
+        }
+      } catch (err) {
+        console.error("Closing question error:", err);
+        setClosingQuestionStatus("error");
+        setClosingQuestionError(
+          err instanceof Error
+            ? err.message
+            : "Unknown error occurred while generating the closing question"
+        );
       }
-    } catch (err) {
-      console.error('Closing question error:', err);
-      setClosingQuestionStatus('error');
-      setClosingQuestionError(
-        err instanceof Error ? err.message : 'Unknown error occurred while generating the closing question'
-      );
-    }
-  }, []);
+    },
+    []
+  );
 
-  const requestClosingQuestion = useCallback((sessionSnapshot: VideoSession) => {
-    const topic =
-      sessionSnapshot.context.initialTopic ||
-      currentTopic ||
-      'your lesson';
+  const requestClosingQuestion = useCallback(
+    (sessionSnapshot: VideoSession) => {
+      const topic =
+        sessionSnapshot.context.initialTopic || currentTopic || "your lesson";
 
-    const voiceoverSections = sessionSnapshot.segments
-      .map((segment, index) => {
-        const script = segment.voiceoverScript?.trim();
-        if (!script) {
-          return null;
-        }
-        return {
-          section: index + 1,
-          script,
-        };
-      })
-      .filter((item): item is ClosingQuestionPayload['voiceoverSections'][number] => item !== null);
+      // Get all nodes from the tree instead of segments array
+      const allNodes = getAllNodes(sessionSnapshot.tree);
 
-    const userResponses = sessionSnapshot.segments
-      .map((segment, index) => {
-        if (!segment.userAnswer) {
-          return null;
-        }
+      const voiceoverSections = allNodes
+        .map((node, index) => {
+          const script = node.segment.voiceoverScript?.trim();
+          if (!script) {
+            return null;
+          }
+          return {
+            section: index + 1,
+            script,
+          };
+        })
+        .filter(
+          (item): item is ClosingQuestionPayload["voiceoverSections"][number] =>
+            item !== null
+        );
 
-        const prompt =
-          (segment.questionText && segment.questionText.trim()) ||
-          `What resonated with you in segment ${index + 1}?`;
+      const userResponses = allNodes
+        .map((node, index) => {
+          if (!node.segment.userAnswer) {
+            return null;
+          }
 
-        return {
-          prompt,
-          answer: segment.userAnswer,
-        };
-      })
-      .filter((item): item is ClosingQuestionPayload['userResponses'][number] => item !== null);
+          const prompt =
+            (node.segment.questionText && node.segment.questionText.trim()) ||
+            `What resonated with you in segment ${index + 1}?`;
 
-    const summary =
-      sessionSnapshot.context.historyTopics && sessionSnapshot.context.historyTopics.length > 0
-        ? sessionSnapshot.context.historyTopics.join(' → ')
-        : undefined;
+          return {
+            prompt,
+            answer: node.segment.userAnswer,
+          };
+        })
+        .filter(
+          (item): item is ClosingQuestionPayload["userResponses"][number] =>
+            item !== null
+        );
 
-    const payload: ClosingQuestionPayload = {
-      topic,
-      voiceoverSections,
-      userResponses,
-      summary,
-    };
+      const summary =
+        sessionSnapshot.context.historyTopics &&
+        sessionSnapshot.context.historyTopics.length > 0
+          ? sessionSnapshot.context.historyTopics.join(" → ")
+          : undefined;
 
-    closingPayloadRef.current = payload;
-    setAppState('closing');
-    void executeClosingQuestionRequest(payload);
-  }, [currentTopic, executeClosingQuestionRequest]);
+      const payload: ClosingQuestionPayload = {
+        topic,
+        voiceoverSections,
+        userResponses,
+        summary,
+      };
+
+      closingPayloadRef.current = payload;
+      setAppState("closing");
+      void executeClosingQuestionRequest(payload);
+    },
+    [currentTopic, executeClosingQuestionRequest]
+  );
 
   const handleRetryClosingQuestion = useCallback(() => {
     if (closingPayloadRef.current) {
@@ -220,27 +246,35 @@ export const App: React.FC = () => {
   }
 
   // Closing question state - show lightweight overlay
-  if (appState === 'closing') {
+  if (appState === "closing") {
     return (
       <div className="relative flex min-h-screen w-full items-center justify-center bg-slate-950">
         <ClosingQuestionOverlay
           isOpen
-          topic={currentTopic || closingPayloadRef.current?.topic || 'Your lesson'}
+          topic={
+            currentTopic || closingPayloadRef.current?.topic || "Your lesson"
+          }
           question={closingQuestion || undefined}
           answer={closingQuestionAnswer}
           onAnswerChange={(newAnswer) => {
             setClosingQuestionAnswer(newAnswer);
-            console.log('Closing question answer:', newAnswer);
+            console.log("Closing question answer:", newAnswer);
           }}
-          isLoading={closingQuestionStatus === 'loading'}
-          error={closingQuestionStatus === 'error' ? closingQuestionError : undefined}
+          isLoading={closingQuestionStatus === "loading"}
+          error={
+            closingQuestionStatus === "error" ? closingQuestionError : undefined
+          }
           onRestart={handleReset}
-          onRetry={closingQuestionStatus === 'error' ? handleRetryClosingQuestion : undefined}
+          onRetry={
+            closingQuestionStatus === "error"
+              ? handleRetryClosingQuestion
+              : undefined
+          }
         />
       </div>
     );
   }
-  
+
   // Learning state - show video flow
   if (appState === "learning" && currentTopic) {
     return (
@@ -262,8 +296,10 @@ export const App: React.FC = () => {
             handleQuestionBranch,
             goToSegment,
           }) => {
+            // Check if current node is a leaf (no children) - this means it's the last segment
             const isLastSegment =
-              session.currentIndex === session.segments.length - 1;
+              getChildren(session.tree, session.tree.currentNodeId).length ===
+              0;
 
             // Debug info in console
             console.log("VideoController State:", {
@@ -293,8 +329,16 @@ export const App: React.FC = () => {
                   navigateToNode(nextNode.id);
                 }
               }
-            }, [currentSegment, isGenerating, isLastSegment, requestClosingQuestion, session, isAutoPlayEnabled, navigateToNode]);
-            
+            }, [
+              currentSegment,
+              isGenerating,
+              isLastSegment,
+              requestClosingQuestion,
+              session,
+              isAutoPlayEnabled,
+              navigateToNode,
+            ]);
+
             // IMPORTANT: Call all hooks BEFORE any conditional returns
             // Effect to restart video when segment changes
             useEffect(() => {
@@ -308,12 +352,12 @@ export const App: React.FC = () => {
                 videoRef.current.play().catch(console.error);
               }
             }, [currentSegment?.id, currentSegment?.videoUrl]);
-            
+
             // Check if video has ended and should auto-advance or trigger reflection
             useEffect(() => {
               if (!videoRef.current) return;
-              
-              videoRef.current.addEventListener('ended', handleVideoEnd);
+
+              videoRef.current.addEventListener("ended", handleVideoEnd);
               return () => {
                 videoRef.current?.removeEventListener("ended", handleVideoEnd);
               };
@@ -355,7 +399,6 @@ export const App: React.FC = () => {
                 });
               };
             }, [session.tree, session.tree.currentNodeId]);
-
 
             // NOW we can do conditional returns
 
