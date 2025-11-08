@@ -103,9 +103,9 @@ export const TreeVisualizer: React.FC<TreeVisualizerProps> = ({
     const newEdges: Edge[] = [];
     
     const nodeSpacing = 35; // Horizontal spacing between nodes
-    const nodeSize = 10;
-    const currentNodeSize = 12;
-    const branchYOffset = 15; // Y offset for branches
+    const nodeSize = 16;
+    const currentNodeSize = 20;
+    const branchYOffset = 20; // Y offset for branches
     
     // Color palette
     const nodeColors = ['#3b82f6', '#f59e0b', '#ec4899', '#8b5cf6', '#10b981', '#ef4444'];
@@ -115,30 +115,33 @@ export const TreeVisualizer: React.FC<TreeVisualizerProps> = ({
     const nodePositions = new Map<string, { x: number; y: number }>();
     const nodeColumns = new Map<string, number>(); // Track which column each node is in
     
-    // BFS to get all nodes level by level
+    // BFS to get all nodes level by level, starting from all roots
     const queue: { node: TreeNode; level: number; column: number }[] = [];
-    if (tree.rootId) {
-      const root = tree.nodes.get(tree.rootId);
-      if (root) {
-        queue.push({ node: root, level: 0, column: 0 });
-        
-        while (queue.length > 0) {
-          const { node, level, column } = queue.shift()!;
-          
-          if (!nodeLevels[level]) nodeLevels[level] = [];
-          nodeLevels[level].push(node);
-          nodeColumns.set(node.id, column);
-          
-          // Add children
-          const children = getChildren(tree, node.id);
-          children.forEach((child, idx) => {
-            queue.push({ 
-              node: child, 
-              level: level + 1, 
-              column: column + idx // Each child gets offset column
-            });
-          });
+    if (tree.rootIds && tree.rootIds.length > 0) {
+      // Add all roots to queue
+      tree.rootIds.forEach((rootId, rootIndex) => {
+        const root = tree.nodes.get(rootId);
+        if (root) {
+          queue.push({ node: root, level: 0, column: rootIndex * 2 }); // Spread roots horizontally
         }
+      });
+      
+      while (queue.length > 0) {
+        const { node, level, column } = queue.shift()!;
+        
+        if (!nodeLevels[level]) nodeLevels[level] = [];
+        nodeLevels[level].push(node);
+        nodeColumns.set(node.id, column);
+        
+        // Add children
+        const children = getChildren(tree, node.id);
+        children.forEach((child, idx) => {
+          queue.push({ 
+            node: child, 
+            level: level + 1, 
+            column: column + idx // Each child gets offset column
+          });
+        });
       }
     }
     
@@ -152,8 +155,8 @@ export const TreeVisualizer: React.FC<TreeVisualizerProps> = ({
     // We want it centered in the viewport
     const centerX = 0; // This will be the "center" - React Flow will center on current node
     
-    // Center Y position for horizontal layout (30 = middle of 60px height)
-    const centerY = 30;
+    // Center Y position for horizontal layout (middle of container height)
+    const centerY = 70;
     
     // Position nodes relative to current node being at centerX
     for (let level = startLevel; level <= endLevel; level++) {
@@ -249,7 +252,7 @@ export const TreeVisualizer: React.FC<TreeVisualizerProps> = ({
   return (
     <div
       className={`bg-slate-800/80 backdrop-blur-sm border border-slate-700 rounded-lg overflow-hidden hover:bg-slate-800/90 transition-colors glow-border relative ${className}`}
-      style={{ height: '80px', width: '100%', maxWidth: '100%' }}
+      style={{ height: '140px', width: '100%', maxWidth: '100%' }}
     >
       {/* History tag in top-left */}
       <div className="absolute top-2 left-2 bg-slate-700/80 rounded px-2 py-1 text-xs text-slate-400 font-medium z-10 pointer-events-none">
@@ -261,6 +264,14 @@ export const TreeVisualizer: React.FC<TreeVisualizerProps> = ({
         className="w-full h-full cursor-pointer relative"
         onClick={handleNodeClick}
       >
+        <style>{`
+          .react-flow__minimap,
+          .react-flow__controls,
+          .react-flow__attribution,
+          .react-flow__panel {
+            display: none !important;
+          }
+        `}</style>
         <ReactFlow
           key={tree.currentNodeId} // Force re-center when node changes
           nodes={nodes}
@@ -279,6 +290,7 @@ export const TreeVisualizer: React.FC<TreeVisualizerProps> = ({
             padding: 0.3,
             includeHiddenNodes: false,
           }}
+          proOptions={{ hideAttribution: true }}
         >
           <Background color="#475569" gap={16} />
         </ReactFlow>

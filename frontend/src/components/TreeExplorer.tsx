@@ -11,7 +11,6 @@ import {
   Edge,
   Handle,
   MarkerType,
-  MiniMap,
   Node,
   NodeMouseHandler,
   NodeProps,
@@ -140,48 +139,122 @@ const nodeTypes = {
 };
 
 /**
- * Calculate hierarchical layout positions using a simple tree layout algorithm
- * Much more spread out for the full-screen view
- * HORIZONTAL LAYOUT: left to right
+ * Calculate bounding box for a set of positioned nodes
+ */
+function calculateTreeBounds(
+  positions: Map<string, { x: number; y: number }>,
+  nodeIds: string[]
+): { minX: number; maxX: number; minY: number; maxY: number } {
+  if (nodeIds.length === 0) {
+    return { minX: 0, maxX: 0, minY: 0, maxY: 0 };
+  }
+  
+  let minX = Infinity;
+  let maxX = -Infinity;
+  let minY = Infinity;
+  let maxY = -Infinity;
+  
+  for (const nodeId of nodeIds) {
+    const pos = positions.get(nodeId);
+    if (pos) {
+      minX = Math.min(minX, pos.x);
+      maxX = Math.max(maxX, pos.x);
+      minY = Math.min(minY, pos.y);
+      maxY = Math.max(maxY, pos.y);
+    }
+  }
+  
+  return { minX, maxX, minY, maxY };
+}
+
+/**
+ * Get all node IDs belonging to a specific root tree
+ */
+function getNodesInTree(tree: LearningTree, rootId: string): string[] {
+  const nodeIds: string[] = [];
+  
+  function traverse(nodeId: string) {
+    nodeIds.push(nodeId);
+    const node = tree.nodes.get(nodeId);
+    if (node && node.childIds.length > 0) {
+      node.childIds.forEach(childId => traverse(childId));
+    }
+  }
+  
+  traverse(rootId);
+  return nodeIds;
+}
+
+/**
+ * Calculate hierarchical layout positions for multi-root trees
+ * HORIZONTAL LAYOUT: left to right with vertical branching
+ * Uses collision-aware positioning to place roots dynamically
  */
 function calculateTreeLayout(tree: LearningTree) {
   const positions = new Map<string, { x: number; y: number }>();
-  const levelWidth = new Map<number, number>();
-
-  // Traverse tree level by level
-  function traverse(
-    nodeId: string,
-    level: number,
-    parentY: number,
-    childIndex: number,
-    totalSiblings: number
+  const verticalSpacing = 200; // Spacing between siblings (vertical branching)
+  const horizontalSpacing = 280; // Space between levels (horizontal progression)
+  const treeClearance = 400; // Minimum clearance between separate root trees (horizontal)
+  
+  // Traverse a single tree with HORIZONTAL layout (left to right)
+  function traverseTree(
+    rootId: string, 
+    offsetX: number, 
+    offsetY: number,
+    targetMap: Map<string, { x: number; y: number }>
   ) {
-    const currentWidth = levelWidth.get(level) || 0;
-    levelWidth.set(level, currentWidth + 1);
-
-    // Calculate y position based on parent and siblings - MUCH MORE SPACING
-    const verticalSpacing = 200; // Spacing between siblings (now vertical) - reduced since labels are below
-    const horizontalSpacing = 280; // Space between levels (now horizontal) - increased for labels
-    const offsetY =
-      (childIndex - (totalSiblings - 1) / 2) * verticalSpacing + parentY;
-
-    positions.set(nodeId, {
-      x: level * horizontalSpacing, // X is now the level (horizontal progression)
-      y: offsetY, // Y is now the offset (vertical branching)
-    });
-
-    // Get children and traverse
-    const node = tree.nodes.get(nodeId);
-    if (node && node.childIds.length > 0) {
-      node.childIds.forEach((childId, index) => {
-        traverse(childId, level + 1, offsetY, index, node.childIds.length);
+    const levelWidth = new Map<number, number>();
+    
+    function traverse(nodeId: string, level: number, parentY: number, childIndex: number, totalSiblings: number) {
+      const currentWidth = levelWidth.get(level) || 0;
+      levelWidth.set(level, currentWidth + 1);
+      
+      // HORIZONTAL LAYOUT: x is level (left to right), y is branching (vertical)
+      const localOffsetY = (childIndex - (totalSiblings - 1) / 2) * verticalSpacing + parentY;
+      
+      targetMap.set(nodeId, {
+        x: level * horizontalSpacing + offsetX, // X is the level (horizontal progression)
+        y: localOffsetY + offsetY, // Y is the offset (vertical branching)
       });
+      
+      const node = tree.nodes.get(nodeId);
+      if (node && node.childIds.length > 0) {
+        node.childIds.forEach((childId, index) => {
+          traverse(childId, level + 1, localOffsetY, index, node.childIds.length);
+        });
+      }
     }
+    
+    traverse(rootId, 0, 0, 0, 1);
   }
-
-  // Start from root - centered
-  if (tree.rootId) {
-    traverse(tree.rootId, 0, 0, 0, 1);
+  
+  // Get root IDs from the tree
+  const rootIds = tree.rootIds || [];
+  if (rootIds.length === 0) return positions;
+  
+  // First root at origin
+  traverseTree(rootIds[0], 0, 0, positions);
+  
+  // Position remaining roots with collision avoidance (horizontally separated)
+  for (let i = 1; i < rootIds.length; i++) {
+    const rootId = rootIds[i];
+    
+    // Layout tree temporarily at origin to calculate its bounds
+    const tempPositions = new Map<string, { x: number; y: number }>();
+    traverseTree(rootId, 0, 0, tempPositions);
+    const treeNodes = getNodesInTree(tree, rootId);
+    const treeBounds = calculateTreeBounds(tempPositions, treeNodes);
+    
+    // Find safe position to the right of all existing trees
+    let safeX = 0;
+    const existingNodeIds = Array.from(positions.keys());
+    if (existingNodeIds.length > 0) {
+      const existingBounds = calculateTreeBounds(positions, existingNodeIds);
+      safeX = existingBounds.maxX + treeClearance + Math.abs(treeBounds.minX);
+    }
+    
+    // Layout this tree at the safe position
+    traverseTree(rootId, safeX, 0, positions);
   }
 
   return positions;
@@ -375,17 +448,6 @@ export const TreeExplorer: React.FC<TreeExplorerProps> = ({
               background: "#1e293b",
               border: "1px solid #475569",
               borderRadius: "8px",
-            }}
-          />
-          <MiniMap
-            style={{
-              background: "#1e293b",
-              border: "1px solid #475569",
-              borderRadius: "8px",
-            }}
-            nodeColor={(node) => {
-              const isCurrent = node.id === tree.currentNodeId;
-              return isCurrent ? "#3b82f6" : "#64748b";
             }}
           />
 
