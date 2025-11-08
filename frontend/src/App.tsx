@@ -68,12 +68,13 @@ export const App: React.FC = () => {
   
   /**
    * Return to landing page
+   * Note: Currently unused - "Start Over" now restarts from first segment
    */
-  const handleReset = () => {
-    setAppState('landing');
-    setCurrentTopic('');
-    setError('');
-  };
+  // const handleReset = () => {
+  //   setAppState('landing');
+  //   setCurrentTopic('');
+  //   setError('');
+  // };
 
   // Render based on app state
   if (appState === 'landing') {
@@ -102,6 +103,7 @@ export const App: React.FC = () => {
             requestNextSegment,
             requestNewTopic,
             goToSegment,
+            restartFromBeginning,
           }) => {
             // Debug info in console
             console.log('VideoController State:', {
@@ -113,7 +115,7 @@ export const App: React.FC = () => {
             });
             
             // IMPORTANT: Call all hooks BEFORE any conditional returns
-            // Effect to restart video when segment changes
+            // Effect to restart video when segment changes OR when session is restarted
             useEffect(() => {
               if (currentSegment && currentSegment.videoUrl && videoRef.current) {
                 setSegmentKey((prev) => prev + 1);
@@ -121,7 +123,7 @@ export const App: React.FC = () => {
                 videoRef.current.load();
                 videoRef.current.play().catch(console.error);
               }
-            }, [currentSegment?.id, currentSegment?.videoUrl]);
+            }, [currentSegment?.id, currentSegment?.videoUrl, session.sessionId]);
             
             // Handler for when video ends
             const handleVideoEnd = () => {
@@ -180,6 +182,19 @@ export const App: React.FC = () => {
                     <span className="ml-2 text-slate-400">Depth: </span>
                     <span className="text-slate-300">{session.context.depth}</span>
                   </div>
+                </div>
+                
+                {/* Start Over button - top center */}
+                <div className="absolute top-4 left-1/2 transform -translate-x-1/2 z-50">
+                  <button
+                    onClick={restartFromBeginning}
+                    className="bg-slate-800/80 backdrop-blur-sm hover:bg-slate-700/80 text-white px-4 py-2 rounded-lg text-sm transition-colors border border-slate-700 hover:border-blue-500/50 flex items-center gap-2"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                    </svg>
+                    Start Over
+                  </button>
                 </div>
                 
                 {/* Navigation through history */}
@@ -263,7 +278,6 @@ export const App: React.FC = () => {
                     }}
                     onRequestNext={requestNextSegment}
                     onNewTopic={requestNewTopic}
-                    onReset={handleReset}
                     onRepeat={() => {
                       setVideoEnded(false);
                       goToSegment(0); // Go back to first segment

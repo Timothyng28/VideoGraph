@@ -22,7 +22,6 @@ interface InputOverlayProps {
   onAnswer: (answer: string) => Promise<{ correct: boolean; correctAnswer?: string } | undefined>;
   onRequestNext: () => void;
   onNewTopic: (topic: string) => void;
-  onReset: () => void;
   onRepeat: () => void;
 }
 
@@ -37,7 +36,6 @@ export const InputOverlay: React.FC<InputOverlayProps> = ({
   onAnswer,
   onRequestNext,
   onNewTopic,
-  onReset,
   onRepeat,
 }) => {
   const [showNewTopicInput, setShowNewTopicInput] = useState(false);
@@ -258,19 +256,9 @@ export const InputOverlay: React.FC<InputOverlayProps> = ({
             {/* Switch Topic button */}
             <button
               onClick={() => setShowNewTopicInput(true)}
-              className="px-4 py-2 text-slate-300 hover:text-white transition-colors text-sm"
+              className="px-4 py-2 text-slate-300 hover:text-white transition-colors text-base font-semibold"
             >
               Switch Topic
-            </button>
-            
-            <span className="text-slate-600">•</span>
-            
-            {/* Start Over button */}
-            <button
-              onClick={onReset}
-              className="px-4 py-2 text-slate-400 hover:text-white transition-colors text-sm"
-            >
-              Start Over
             </button>
           </div>
         </div>

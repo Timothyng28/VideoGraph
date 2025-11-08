@@ -46,6 +46,7 @@ export interface VideoControllerState {
   requestNextSegment: () => Promise<void>;
   requestNewTopic: (topic: string) => Promise<void>;
   goToSegment: (index: number) => void;
+  restartFromBeginning: () => void;
 }
 
 interface VideoControllerProps {
@@ -481,6 +482,20 @@ export const VideoController: React.FC<VideoControllerProps> = ({
     }
   }, [session.segments.length]);
   
+  /**
+   * Restart from the first segment
+   * Forces a re-render even if already on segment 0
+   */
+  const restartFromBeginning = useCallback(() => {
+    setSession((prev) => ({
+      ...prev,
+      currentIndex: 0,
+      lastUpdatedAt: new Date().toISOString(),
+      // Force update by changing a timestamp - this ensures video restarts even if on segment 0
+      sessionId: `${prev.sessionId.split('_restart')[0]}_restart_${Date.now()}`,
+    }));
+  }, []);
+  
   // Build state object for children
   const state: VideoControllerState = {
     session,
@@ -493,6 +508,7 @@ export const VideoController: React.FC<VideoControllerProps> = ({
     requestNextSegment,
     requestNewTopic,
     goToSegment,
+    restartFromBeginning,
   };
   
   return <>{children(state)}</>;
