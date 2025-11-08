@@ -73,7 +73,6 @@ def generate_educational_video_logic(
 
         # Cerebras Qwen-3 for plan generation (STAGE 1)
         plan_provider = "cerebras"
-        # plan_model = "qwen-3-235b-a22b-instruct-2507"
         plan_model = "qwen-3-235b-a22b-instruct-2507"
 
         print(f"🔧 Initializing {plan_provider} {plan_model} service for plan generation...")
