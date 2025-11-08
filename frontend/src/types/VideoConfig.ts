@@ -1,6 +1,6 @@
 /**
  * VideoConfig.ts
- * 
+ *
  * Type definitions for the infinite video learning system.
  * Replaces the old rigid scene-based structure with flexible video segments.
  */
@@ -15,12 +15,12 @@ export interface VideoSegment {
   hasQuestion: boolean; // Whether this segment ends with a question
   questionText?: string; // The question text if hasQuestion is true
   topic: string; // What topic this segment teaches
-  difficulty: 'easy' | 'medium' | 'hard'; // Difficulty level
+  difficulty: "easy" | "medium" | "hard"; // Difficulty level
   // Optional metadata
   generatedAt?: string;
   parentSegmentId?: string; // ID of the segment that led to this one
   videoUrl?: string; // URL to the rendered video (set after rendering)
-  renderingStatus?: 'pending' | 'rendering' | 'completed' | 'failed'; // Status of video rendering
+  renderingStatus?: "pending" | "rendering" | "completed" | "failed"; // Status of video rendering
   voiceoverScript?: string; // Combined narration text for this segment
   userAnswer?: string; // Learner's response collected during this segment
 }
@@ -32,27 +32,27 @@ export interface VideoSegment {
 export interface LearningContext {
   // Initial topic user wanted to learn
   initialTopic?: string;
-  
+
   // Most recent topic being taught
   previousTopic?: string;
-  
+
   // User's last answer (if they answered a question)
   userAnswer?: string;
-  
+
   // Whether the last answer was correct
   wasCorrect?: boolean;
-  
+
   // History of topics covered in this session
   historyTopics: string[];
-  
+
   // Current depth in the topic (how many segments deep)
   depth: number;
-  
+
   // Pattern of correctness (to adjust difficulty intelligently)
   correctnessPattern?: boolean[]; // last N answers
-  
+
   // User preference for learning style (if we track this)
-  preferredStyle?: 'visual' | 'code-heavy' | 'conceptual' | 'mixed';
+  preferredStyle?: "visual" | "code-heavy" | "conceptual" | "mixed";
 }
 
 /**
@@ -85,10 +85,10 @@ export interface LearningTree {
 export interface VideoSession {
   // Tree structure for branching navigation
   tree: LearningTree;
-  
+
   // Learning context for generating next segments
   context: LearningContext;
-  
+
   // Session metadata
   sessionId: string;
   startedAt: string;
@@ -101,13 +101,13 @@ export interface VideoSession {
 export interface LegacyVideoSession {
   // All video segments generated in this session
   segments: VideoSegment[];
-  
+
   // Index of the currently playing segment
   currentIndex: number;
-  
+
   // Learning context for generating next segments
   context: LearningContext;
-  
+
   // Session metadata
   sessionId: string;
   startedAt: string;
@@ -131,7 +131,7 @@ export interface EvaluateAnswerResponse {
   correct?: boolean;
   reasoning?: string;
   suggestedNextTopic?: string;
-  suggestedDifficulty?: 'easy' | 'medium' | 'hard';
+  suggestedDifficulty?: "easy" | "medium" | "hard";
   error?: string;
 }
 
@@ -195,7 +195,7 @@ export function createInitialContext(topic: string): LearningContext {
     historyTopics: [],
     depth: 0,
     correctnessPattern: [],
-    preferredStyle: 'mixed',
+    preferredStyle: "mixed",
   };
 }
 
@@ -219,10 +219,10 @@ export function createVideoSession(initialTopic: string): VideoSession {
   // Create empty tree (will be populated when first segment is generated)
   const tree: LearningTree = {
     nodes: new Map(),
-    rootId: '',
-    currentNodeId: '',
+    rootId: "",
+    currentNodeId: "",
   };
-  
+
   return {
     tree,
     context: createInitialContext(initialTopic),
@@ -236,7 +236,9 @@ export function createVideoSession(initialTopic: string): VideoSession {
  * Helper function to create a legacy linear video session
  * @deprecated Use createVideoSession instead
  */
-export function createLegacyVideoSession(initialTopic: string): LegacyVideoSession {
+export function createLegacyVideoSession(
+  initialTopic: string
+): LegacyVideoSession {
   return {
     segments: [],
     currentIndex: 0,
@@ -295,4 +297,3 @@ export interface VideoConfig {
   generatedAt?: string;
   version?: string;
 }
-

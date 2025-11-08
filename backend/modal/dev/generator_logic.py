@@ -13,7 +13,6 @@ from .config import (
     TEMP,
 )
 
-
 VOICEOVER_PATTERN = re.compile(
     r'self\.voiceover\(\s*(?:text\s*=\s*)?(?P<prefix>[fFbBrRuU]{0,2})(?P<quote>"""|\'\'\'|"|\')(?P<text>.*?)(?P=quote)',
     re.DOTALL,
