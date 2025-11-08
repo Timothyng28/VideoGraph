@@ -15,6 +15,8 @@ import { LoadingSpinner } from "./components/LoadingSpinner";
 import { ErrorDisplay } from "./components/ErrorDisplay";
 import { TreeVisualizer } from "./components/TreeVisualizer";
 import { TreeExplorer } from "./components/TreeExplorer";
+import { SegmentationOverlay, SegmentationLoading } from "./components/SegmentationOverlay";
+import { handleVideoSegmentation, SegmentationMask } from "./services/segmentationService";
 
 /**
  * App state types
@@ -35,6 +37,12 @@ export const App: React.FC = () => {
   
   // Track when segment changes to restart playback
   const [segmentKey, setSegmentKey] = useState(0);
+  
+  // Segmentation state (always enabled)
+  const [segmentationMasks, setSegmentationMasks] = useState<SegmentationMask[] | null>(null);
+  const [isSegmenting, setIsSegmenting] = useState(false);
+  const [videoDisplaySize, setVideoDisplaySize] = useState({ width: 0, height: 0 });
+  const [videoActualSize, setVideoActualSize] = useState({ width: 0, height: 0 });
   
   // ===== TEST MODE - EASILY REMOVABLE =====
   const [isTestMode, setIsTestMode] = useState(false);
@@ -93,8 +101,118 @@ export const App: React.FC = () => {
     setCurrentTopic('');
     setError('');
     setIsTestMode(false); // Reset test mode
+    setSegmentationMasks(null);
   };
-
+  
+  /**
+   * Check if clicked area is mostly black background
+   */
+  const isBlackBackground = (video: HTMLVideoElement, x: number, y: number): boolean => {
+    try {
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return false;
+      
+      // Sample a small area around the click point
+      const sampleSize = 20;
+      canvas.width = sampleSize;
+      canvas.height = sampleSize;
+      
+      // Calculate sampling position
+      const rect = video.getBoundingClientRect();
+      const videoX = ((x - rect.left) / rect.width) * video.videoWidth;
+      const videoY = ((y - rect.top) / rect.height) * video.videoHeight;
+      
+      // Draw the sample area
+      ctx.drawImage(
+        video,
+        videoX - sampleSize / 2,
+        videoY - sampleSize / 2,
+        sampleSize,
+        sampleSize,
+        0,
+        0,
+        sampleSize,
+        sampleSize
+      );
+      
+      // Get pixel data
+      const imageData = ctx.getImageData(0, 0, sampleSize, sampleSize);
+      const data = imageData.data;
+      
+      // Calculate average brightness
+      let totalBrightness = 0;
+      for (let i = 0; i < data.length; i += 4) {
+        const r = data[i];
+        const g = data[i + 1];
+        const b = data[i + 2];
+        totalBrightness += (r + g + b) / 3;
+      }
+      const avgBrightness = totalBrightness / (sampleSize * sampleSize);
+      
+      // Consider it black if average brightness is less than 15 (out of 255)
+      return avgBrightness < 15;
+    } catch (error) {
+      console.log('Could not check background color:', error);
+      return false;
+    }
+  };
+  
+  /**
+   * Handle video container click for segmentation
+   * Always triggers segmentation (mode always enabled)
+   */
+  const handleVideoContainerClick = async (event: React.MouseEvent<HTMLDivElement>) => {
+    const video = videoRef.current;
+    if (!video) return;
+    
+    // Check if clicked on black background - clear segmentation if active
+    if (isBlackBackground(video, event.clientX, event.clientY)) {
+      console.log('⚫ Clicked on black background, clearing segmentation');
+      setSegmentationMasks(null);
+      return;
+    }
+    
+    // Update display size right before segmentation
+    const rect = video.getBoundingClientRect();
+    if (rect.width > 0 && rect.height > 0) {
+      setVideoDisplaySize({
+        width: rect.width,
+        height: rect.height,
+      });
+      console.log('📐 Pre-segmentation video display size:', rect.width, 'x', rect.height);
+    }
+    
+    // Clear previous segmentation
+    setSegmentationMasks(null);
+    setIsSegmenting(true);
+    
+    try {
+      // Perform segmentation
+      const result = await handleVideoSegmentation(event, video);
+      
+      if (result && result.success && result.masks) {
+        setSegmentationMasks(result.masks);
+        
+        // Store video dimensions for overlay
+        if (result.image_size) {
+          setVideoActualSize({
+            width: result.image_size.width,
+            height: result.image_size.height,
+          });
+          console.log('📐 Video actual size from API:', result.image_size.width, 'x', result.image_size.height);
+        }
+        
+      } else {
+        console.error('Segmentation failed:', result?.error);
+      }
+    } catch (error) {
+      console.error('Error in video segmentation:', error);
+    } finally {
+      setIsSegmenting(false);
+    }
+  };
+  
   // Render based on app state
   if (appState === 'landing') {
     return (
@@ -149,8 +267,49 @@ export const App: React.FC = () => {
                 setSegmentKey((prev) => prev + 1);
                 videoRef.current.load();
                 videoRef.current.play().catch(console.error);
+                
+                // Clear segmentation when segment changes
+                setSegmentationMasks(null);
               }
             }, [currentSegment?.id, currentSegment?.videoUrl]);
+            
+            // Effect to track video display size for segmentation overlay
+            useEffect(() => {
+              const video = videoRef.current;
+              if (!video) return;
+              
+              const updateVideoSize = () => {
+                const rect = video.getBoundingClientRect();
+                console.log('📐 Updating video size from rect:', rect);
+                
+                // Only update if we have valid dimensions
+                if (rect.width > 0 && rect.height > 0) {
+                  setVideoDisplaySize({
+                    width: rect.width,
+                    height: rect.height,
+                  });
+                  console.log('✓ Video display size set to:', rect.width, 'x', rect.height);
+                } else {
+                  console.log('⚠️ Video rect has 0 dimensions, will retry...');
+                }
+              };
+              
+              // Update on load and resize
+              video.addEventListener('loadedmetadata', updateVideoSize);
+              video.addEventListener('loadeddata', updateVideoSize);
+              window.addEventListener('resize', updateVideoSize);
+              
+              // Try multiple times to catch when video is actually rendered
+              updateVideoSize(); // Immediate
+              setTimeout(updateVideoSize, 100); // After 100ms
+              setTimeout(updateVideoSize, 500); // After 500ms
+              
+              return () => {
+                video.removeEventListener('loadedmetadata', updateVideoSize);
+                video.removeEventListener('loadeddata', updateVideoSize);
+                window.removeEventListener('resize', updateVideoSize);
+              };
+            }, [currentSegment?.videoUrl]);
             
             // Check if video has ended and should auto-advance
             useEffect(() => {
@@ -228,20 +387,37 @@ export const App: React.FC = () => {
                 {/* Video Player Container */}
                 <div className="relative shadow-2xl rounded-lg overflow-hidden bg-black" style={{ width: "90vw", maxWidth: "1280px" }}>
                   {currentSegment.videoUrl ? (
-                    <video
-                      key={segmentKey}
-                      ref={videoRef}
-                      src={currentSegment.videoUrl}
-                      controls
-                      autoPlay
-                      loop={currentSegment.hasQuestion}
-                      className="w-full h-auto"
-                      style={{
-                        maxHeight: "80vh",
-                      }}
-                    >
-                      Your browser does not support the video tag.
-                    </video>
+                    <>
+                      <video
+                        key={segmentKey}
+                        ref={videoRef}
+                        src={currentSegment.videoUrl}
+                        controls
+                        autoPlay
+                        loop={currentSegment.hasQuestion}
+                        crossOrigin="anonymous"
+                        className="w-full h-auto"
+                        style={{
+                          maxHeight: "80vh",
+                        }}
+                      >
+                        Your browser does not support the video tag.
+                      </video>
+                      
+                      {/* Segmentation loading indicator */}
+                      {isSegmenting && <SegmentationLoading />}
+                      
+                      {/* Segmentation overlay */}
+                      {segmentationMasks && segmentationMasks.length > 0 && (
+                        <SegmentationOverlay
+                          masks={segmentationMasks}
+                          videoWidth={videoActualSize.width}
+                          videoHeight={videoActualSize.height}
+                          displayWidth={videoDisplaySize.width}
+                          displayHeight={videoDisplaySize.height}
+                        />
+                      )}
+                    </>
                   ) : currentSegment.renderingStatus === 'rendering' || currentSegment.renderingStatus === 'pending' ? (
                     <div className="flex items-center justify-center" style={{ width: "100%", height: "450px" }}>
                       <div className="text-center text-white">
