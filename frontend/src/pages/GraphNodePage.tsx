@@ -583,31 +583,54 @@ export const GraphNodePage: React.FC = () => {
                           </div>
                         </div>
                       ) : currentSegment.videoUrl ? (
-                        <video
-                          key={segmentKey}
-                          ref={videoRef}
-                          src={currentSegment.videoUrl}
-                          controls
-                          autoPlay
-                          className="w-full h-auto"
+                        <div
+                          className="w-full relative bg-black"
                           style={{
+                            aspectRatio: "16 / 9",
                             maxHeight: "80vh",
                           }}
-                          onLoadedData={() => {
-                            console.log("📺 Video loaded and ready to play");
-                          }}
-                          onPlay={() => {
-                            console.log("▶️ Video started playing");
-                          }}
-                          onPause={() => {
-                            console.log("⏸️ Video paused");
-                          }}
-                          onEnded={() => {
-                            console.log("🏁 Video ended (native event)");
-                          }}
                         >
-                          Your browser does not support the video tag.
-                        </video>
+                          {/* Thumbnail placeholder (shows while video is loading) */}
+                          {currentSegment.thumbnailUrl && (
+                            <img
+                              src={currentSegment.thumbnailUrl}
+                              alt="Video thumbnail"
+                              className="absolute inset-0 w-full h-full object-contain"
+                              style={{
+                                opacity:
+                                  (videoRef.current?.readyState ?? 0) >= 2
+                                    ? 0
+                                    : 1,
+                                transition: "opacity 0.3s ease-in-out",
+                              }}
+                            />
+                          )}
+
+                          <video
+                            key={segmentKey}
+                            ref={videoRef}
+                            src={currentSegment.videoUrl}
+                            poster={currentSegment.thumbnailUrl}
+                            preload="auto"
+                            controls
+                            autoPlay
+                            className="absolute inset-0 w-full h-full object-contain"
+                            onLoadedData={() => {
+                              console.log("📺 Video loaded and ready to play");
+                            }}
+                            onPlay={() => {
+                              console.log("▶️ Video started playing");
+                            }}
+                            onPause={() => {
+                              console.log("⏸️ Video paused");
+                            }}
+                            onEnded={() => {
+                              console.log("🏁 Video ended (native event)");
+                            }}
+                          >
+                            Your browser does not support the video tag.
+                          </video>
+                        </div>
                       ) : currentSegment.renderingStatus === "rendering" ||
                         currentSegment.renderingStatus === "pending" ? (
                         <div
