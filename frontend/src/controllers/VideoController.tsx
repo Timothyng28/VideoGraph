@@ -300,12 +300,13 @@ export const VideoController: React.FC<VideoControllerProps> = ({
     
     try {
       const topic = session.context.initialTopic || 'a topic';
+      const voiceId = session.context.voiceId;
       
       const result = await generateVideoScenes(topic, (progress) => {
         // Update progress state for UI
         setGenerationProgress(progress);
         console.log('Generation progress:', progress);
-      });
+      }, voiceId);
       
       if (result.success && result.sections && result.sections.length > 0) {
         const detailByUrl = new Map<string, SectionDetail>();
@@ -518,7 +519,7 @@ export const VideoController: React.FC<VideoControllerProps> = ({
         
         const result = await generateVideoScenes(newTopic, (progress) => {
           console.log(`[${request.id}] Generation progress:`, progress);
-        });
+        }, session.context.voiceId);
         
         if (result.success && result.sections && result.sections.length > 0) {
           const detailByUrl = new Map<string, SectionDetail>();
@@ -706,7 +707,7 @@ export const VideoController: React.FC<VideoControllerProps> = ({
         // Generate video for this phase using Modal backend with full context
         const result = await generateVideoScenes(contextualTopic, (progress) => {
           console.log(`[${request.id}] Video ${i + 1} progress:`, progress);
-        });
+        }, session.context.voiceId);
         
         if (result.success && result.sections && result.sections.length > 0) {
           // Create segment from first section (we only need one video per phase)
@@ -903,7 +904,7 @@ export const VideoController: React.FC<VideoControllerProps> = ({
           
           const videoResult = await generateVideoScenes(explanationTopic, (progress) => {
             setGenerationProgress(progress);
-          });
+          }, session.context.voiceId);
           
           if (videoResult.success && videoResult.sections && videoResult.sections.length > 0) {
             const videoUrl = videoResult.sections[0];
@@ -1222,7 +1223,7 @@ export const VideoController: React.FC<VideoControllerProps> = ({
       const result = await generateVideoScenes(adaptiveTopic, (progress) => {
         setGenerationProgress(progress);
         console.log('Generation progress:', progress);
-      });
+      }, session.context.voiceId);
 
       if (result.success && result.sections && result.sections.length > 0) {
         const detailByUrl = new Map<string, SectionDetail>();

@@ -56,6 +56,9 @@ export interface LearningContext {
 
   // User preference for learning style (if we track this)
   preferredStyle?: "visual" | "code-heavy" | "conceptual" | "mixed";
+  
+  // Voice ID for text-to-speech (ElevenLabs)
+  voiceId?: string;
 }
 
 /**

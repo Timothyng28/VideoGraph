@@ -28,7 +28,7 @@ import {
   loadVideoSession,
   clearVideoSession,
 } from "./types/TreeState";
-import { ClosingQuestionPayload, VideoSession } from "./types/VideoConfig";
+import { ClosingQuestionPayload, VideoSession, createVideoSession } from "./types/VideoConfig";
 
 /**
  * App state types
@@ -140,7 +140,7 @@ export const App: React.FC = () => {
    * Handle topic submission from landing page
    * Tries to load cached session first, then falls back to generating new session
    */
-  const handleTopicSubmit = async (topic: string) => {
+  const handleTopicSubmit = async (topic: string, voiceId?: string) => {
     resetClosingQuestionState();
     resetLeafQuestionState();
     setHasSeenFirstVideo(false); // Reset video tracking for new session
@@ -165,7 +165,14 @@ export const App: React.FC = () => {
 
     // No cached session available or failed to load - generate fresh
     clearVideoSession(); // Clear localStorage to force fresh generation
-    setCachedSession(null); // Clear any cached session to force new generation
+    
+    // Create a new session with the voice ID
+    const newSession = createVideoSession(topic);
+    if (voiceId) {
+      newSession.context.voiceId = voiceId;
+    }
+    
+    setCachedSession(newSession);
     setCurrentTopic(topic);
     setIsTestMode(false); // Normal mode
     setAppState("learning");

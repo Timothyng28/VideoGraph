@@ -268,8 +268,10 @@ function buildSegmentPrompt(context: LearningContext): string {
     }
   }
   
+  // Use voice_id from context or default to male voice
+  const voiceId = context.voiceId || "pqHfZKP75CvOlQylNhV4";
   const ttsInit = `from tts import ElevenLabsTimedService
-        self.set_speech_service(ElevenLabsTimedService(voice_id="pqHfZKP75CvOlQylNhV4", transcription_model=None))`;
+        self.set_speech_service(ElevenLabsTimedService(voice_id="${voiceId}", transcription_model=None))`;
   
   return `You are an expert Manim animator creating educational explainer videos similar to 3Blue1Brown. Your task is to generate complete, runnable Manim code that creates an engaging explainer animation with exceptional spatial awareness and visual design.
 
@@ -368,7 +370,7 @@ ${isFirst ? '' : '5. **Question** (5-10 seconds): Display a clear question to te
 ❌ **NEVER USE**: \`KokoroService()\` or any other TTS service
 ✅ **CORRECT**: For standard Scene class, use only 2D elements: Axes(), NumberPlane(), .shift(), .move_to()
 ✅ **CORRECT**: For 3D, you MUST inherit from ThreeDScene: \`class MyScene(ThreeDScene):\`
-✅ **CORRECT**: For audio, ALWAYS use: \`self.set_speech_service(ElevenLabsTimedService(voice_id="pqHfZKP75CvOlQylNhV4", transcription_model=None))\`
+✅ **CORRECT**: For audio, use the EXACT TTS initialization provided in the template above
 
 REMEMBER: Focus on QUALITY over QUANTITY - one concept explained well in 90 seconds is better than rushing through multiple concepts. Adapt visual techniques to the topic while maintaining the same educational rigor used in mathematical explanations.
 
