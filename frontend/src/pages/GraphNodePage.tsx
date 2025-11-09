@@ -475,9 +475,9 @@ export const GraphNodePage: React.FC = () => {
                 </div>
 
                 {/* Main Content Area */}
-                <div className="flex-1 flex flex-col items-center justify-center relative p-4">
+                <div className="flex-1 flex flex-col items-center justify-center relative p-4 pb-[212px]">
                   {/* Video Player Container with Navigation */}
-                  <div className="flex items-center gap-4 mb-4">
+                  <div className="flex items-center gap-4">
                     {/* Previous Button */}
                     <button
                       onClick={() => {
@@ -661,9 +661,10 @@ export const GraphNodePage: React.FC = () => {
                     </button>
                   </div>
 
-                  {/* Node Carousel - horizontal timeline below video */}
+                  {/* Node Carousel - absolutely positioned at bottom */}
                   {session.tree.nodes.size > 0 && (
                     <div
+                      className="absolute bottom-12 left-1/2 -translate-x-1/2"
                       style={{
                         width: "calc(100vw - 400px)",
                         maxWidth: "1280px",
