@@ -34,10 +34,9 @@ interface TreeVisualizerProps {
 }
 
 /**
- * Custom node component that shows label on hover
+ * Custom node component (no hover labels in mini tree view)
  */
 const TreeNode = ({ data }: NodeProps) => {
-  const [showLabel, setShowLabel] = useState(false);
   const [imageError, setImageError] = useState(false);
   
   const hasThumbnail = data.thumbnailUrl && !imageError;
@@ -45,8 +44,6 @@ const TreeNode = ({ data }: NodeProps) => {
   return (
     <div 
       className="relative w-full h-full flex items-center justify-center"
-      onMouseEnter={() => setShowLabel(true)}
-      onMouseLeave={() => setShowLabel(false)}
     >
       {/* Connection handles - invisible but necessary for edges */}
       <Handle type="target" position={Position.Left} style={{ opacity: 0 }} />
@@ -61,14 +58,6 @@ const TreeNode = ({ data }: NodeProps) => {
             className="w-full h-full object-cover"
             onError={() => setImageError(true)}
           />
-        </div>
-      )}
-      
-      {/* Label tooltip on hover */}
-      {showLabel && (data.nodeNumber || data.title) && (
-        <div className="absolute top-full mt-2 left-1/2 transform -translate-x-1/2 bg-slate-900 text-white text-xs px-2 py-1 rounded whitespace-nowrap z-50 pointer-events-none shadow-lg border border-slate-700 max-w-[200px]">
-          <div className="font-semibold">{data.nodeNumber}</div>
-          {data.title && <div className="text-[10px] text-slate-300 mt-0.5 truncate">{data.title}</div>}
         </div>
       )}
     </div>
@@ -306,7 +295,7 @@ export const TreeVisualizer: React.FC<TreeVisualizerProps> = ({
         </ReactFlow>
         
         {/* Expand hint overlay */}
-        <div className="absolute right-2 top-1/2 transform -translate-y-1/2 bg-slate-700/80 rounded px-2 py-1 text-xs text-slate-300 whitespace-nowrap pointer-events-none">
+        <div className="absolute right-2 top-2 bg-slate-700/80 rounded px-2 py-1 text-xs text-slate-300 whitespace-nowrap pointer-events-none">
           Click to expand
         </div>
       </div>
