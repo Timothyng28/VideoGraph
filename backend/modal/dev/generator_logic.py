@@ -305,8 +305,7 @@ def generate_educational_video_logic(
 
         # Initialize TTS service and audio directory for later use
         import asyncio
-        
-        # Create TTS service with custom or default voice
+
         from services.tts import ElevenLabsTimedService
         selected_voice_id = voice_id or "XfNU2rGpBa01ckF309OY"
         print(f"🎙️  Using ElevenLabs voice ID: {selected_voice_id}")
