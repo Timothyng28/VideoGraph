@@ -31,7 +31,6 @@ import {
 import {
   evaluateAnswer,
   generateLeafQuestion,
-  generateRemediationVideo,
 } from '../services/llmService';
 import { generateVideoScenes, GenerationProgress, SectionDetail } from '../services/videoRenderService';
 import { analyzeQuestion } from '../services/questionAnalysisService';
@@ -64,6 +63,7 @@ export interface VideoControllerState {
   showQuiz: boolean;
   quizQuestion: string | null;
   quizResult: 'correct' | 'incorrect' | null;
+  quizExplanation: string | null;
   isGeneratingQuiz: boolean;
   
   // Actions
@@ -188,6 +188,7 @@ export const VideoController: React.FC<VideoControllerProps> = ({
   const [quizQuestion, setQuizQuestion] = useState<string | null>(null);
   const [quizCorrectAnswer, setQuizCorrectAnswer] = useState<string | null>(null);
   const [quizResult, setQuizResult] = useState<'correct' | 'incorrect' | null>(null);
+  const [quizExplanation, setQuizExplanation] = useState<string | null>(null);
   const [isGeneratingQuiz, setIsGeneratingQuiz] = useState(false);
   
   // Get current segment from tree
@@ -758,12 +759,15 @@ export const VideoController: React.FC<VideoControllerProps> = ({
       
       const { correct, explanation } = result;
       
+      // Store the explanation for display
+      setQuizExplanation(explanation || null);
+      
       if (correct) {
         // Show congratulations
         setQuizResult('correct');
         setIsEvaluating(false);
       } else {
-        // Generate explanation video for wrong answer
+        // Show incorrect message with explanation
         setQuizResult('incorrect');
         setIsEvaluating(false);
         
@@ -848,6 +852,7 @@ export const VideoController: React.FC<VideoControllerProps> = ({
     setShowQuiz(false);
     setQuizQuestion(null);
     setQuizResult(null);
+    setQuizExplanation(null);
     setQuizCorrectAnswer(null);
     setError(null);
   }, []);
@@ -1016,59 +1021,8 @@ export const VideoController: React.FC<VideoControllerProps> = ({
       
       setIsEvaluating(false);
       
-      // If INCORRECT: Generate remediation video
-      if (!correct) {
-        console.log('Answer incorrect, generating remediation video');
-        setIsGenerating(true);
-        setGenerationProgress(undefined);
-        
-        try {
-          const branchContext = branchPath
-            .map(node => `${node.nodeNumber}: ${node.topic}`)
-            .join(' → ');
-          
-          const remediationResult = await generateRemediationVideo(
-            question,
-            answer,
-            reasoning || 'Let me explain the correct approach.',
-            branchContext,
-            (progress) => setGenerationProgress(progress)
-          );
-          
-          if (remediationResult.success && remediationResult.segment) {
-            // Add remediation video as child node
-            const remediationNode = addChildNode(
-              session.tree,
-              currentNode.id,
-              remediationResult.segment,
-              'Explanation'
-            );
-            
-            // Navigate to remediation video
-            navigateToNodeHelper(session.tree, remediationNode.id);
-            
-            const finalSession = {
-              ...updatedSession,
-              lastUpdatedAt: new Date().toISOString(),
-            };
-            
-            setSession(finalSession);
-            saveVideoSession(finalSession);
-            
-            console.log('Remediation video generated and navigated to');
-          } else {
-            setError(remediationResult.error || 'Failed to generate remediation video');
-          }
-        } catch (err) {
-          const errorMsg = err instanceof Error ? err.message : 'Unknown error generating remediation';
-          setError(errorMsg);
-          onError?.(errorMsg);
-        } finally {
-          setIsGenerating(false);
-          setGenerationProgress(undefined);
-        }
-      }
-      
+      // Just return the evaluation result with explanation
+      // No video generation needed - the overlay will show the explanation
       return {
         success: true,
         correct,
@@ -1108,6 +1062,7 @@ export const VideoController: React.FC<VideoControllerProps> = ({
     showQuiz,
     quizQuestion,
     quizResult,
+    quizExplanation,
     isGeneratingQuiz,
     handleAnswer,
     requestNextSegment,
