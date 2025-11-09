@@ -211,7 +211,7 @@ class ExplainerScene(Scene):
 - Animations: Create(), Write(), FadeIn(), FadeOut(), Transform(), Shift(), Rotate(), Scale()
 - Grouping: VGroup() for VMobjects only, Group() for mixed types
 - Positioning: .to_edge(), .to_corner(), .next_to(), .shift()
-- Colors: See "AVAILABLE MANIM COLORS" section above for complete list of valid colors
+- Colors: See "AVAILABLE MANIM COLORS" section above for complete list of valid colors. DO NOT USE ANY OTHER COLORS.
 - Wait times: self.wait(seconds)
 
 ## CRITICAL - DO NOT RENDER CODE AS TEXT:
