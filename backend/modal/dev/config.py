@@ -30,6 +30,7 @@ RENDER_SECRETS = [
     "gcp-credentials",  # For GCS uploads (contains GCP_SERVICE_ACCOUNT_JSON)
     "google-api-key",  # For Gemini embeddings
     "embedding-provider",  # Optional override for embedding provider
+    "planning-config",  # Planning LLM provider selection (cerebras/xai)
 ]
 
 MAIN_SECRETS = [
@@ -40,4 +41,5 @@ MAIN_SECRETS = [
     "gcp-credentials",  # For GCS uploads (contains GCP_SERVICE_ACCOUNT_JSON)
     "google-api-key",  # For Gemini embeddings
     "embedding-provider",  # Optional override for embedding provider
+    "planning-config",  # Planning LLM provider selection (cerebras/xai)
 ]
