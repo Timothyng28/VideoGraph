@@ -88,6 +88,49 @@ MANIM_META_PROMPT = """You are an expert Manim animator creating educational exp
 - Apply transformations (FadeIn, FadeOut, Transform, ReplacementTransform, Indicate) to show relationships and changes
 - Use VGroup() to group related elements together and animate them as units
 
+## AVAILABLE MANIM COLORS (MANDATORY - DO NOT USE ANY OTHER COLORS):
+**CRITICAL**: You MUST ONLY use the colors listed below. DO NOT use any color names or hex codes not defined in this list.
+
+### Basic Colors:
+- BLACK, WHITE, GRAY (or GREY), DARKER_GRAY, DARKER_GREY, DARK_GRAY, DARK_GREY, LIGHT_GRAY, LIGHT_GREY, LIGHTER_GRAY, LIGHTER_GREY
+
+### Blue Colors:
+- BLUE, BLUE_A, BLUE_B, BLUE_C, BLUE_D, BLUE_E, DARK_BLUE, PURE_BLUE
+
+### Red Colors:
+- RED, RED_A, RED_B, RED_C, RED_D, RED_E, PURE_RED
+
+### Green Colors:
+- GREEN, GREEN_A, GREEN_B, GREEN_C, GREEN_D, GREEN_E, PURE_GREEN
+
+### Yellow Colors:
+- YELLOW, YELLOW_A, YELLOW_B, YELLOW_C, YELLOW_D, YELLOW_E
+
+### Purple Colors:
+- PURPLE, PURPLE_A, PURPLE_B, PURPLE_C, PURPLE_D, PURPLE_E
+
+### Gold Colors:
+- GOLD, GOLD_A, GOLD_B, GOLD_C, GOLD_D, GOLD_E
+
+### Maroon Colors:
+- MAROON, MAROON_A, MAROON_B, MAROON_C, MAROON_D, MAROON_E
+
+### Teal Colors:
+- TEAL, TEAL_A, TEAL_B, TEAL_C, TEAL_D, TEAL_E
+
+### Other Colors:
+- ORANGE, PINK, LIGHT_PINK, DARK_BROWN, LIGHT_BROWN, GRAY_BROWN (or GREY_BROWN)
+
+### Logo Colors:
+- LOGO_BLACK, LOGO_WHITE, LOGO_BLUE, LOGO_GREEN, LOGO_RED
+
+**Color Usage Rules**:
+- Use ONLY the color names listed above (e.g., `Circle(color=BLUE)`, `Text("Hello", color=RED_C)`)
+- Suffix letters (A, B, C, D, E) indicate lighter to darker shades: A is lightest, E is darkest
+- DO NOT use RGB hex codes directly or any color names not in this list
+- DO NOT create custom colors using Color() or hex codes
+- If you need a specific shade, use the lettered variants (e.g., BLUE_A through BLUE_E for different blue shades)
+
 ## CRITICAL SPATIAL PLACEMENT RULES (MUST FOLLOW):
 1. **MANDATORY Buff Distances**: ALWAYS use .next_to(), .to_edge(), .to_corner() with explicit buff parameter (minimum 0.5, recommended 0.7-1.0 for text)
 2. **NO OVERLAPS ALLOWED**: Before adding any element, consider existing elements' positions - maintain minimum 0.6 units separation
@@ -168,7 +211,7 @@ class ExplainerScene(Scene):
 - Animations: Create(), Write(), FadeIn(), FadeOut(), Transform(), Shift(), Rotate(), Scale()
 - Grouping: VGroup() for VMobjects only, Group() for mixed types
 - Positioning: .to_edge(), .to_corner(), .next_to(), .shift()
-- Colors: BLUE, RED, GREEN, YELLOW, WHITE, PURPLE, ORANGE
+- Colors: See "AVAILABLE MANIM COLORS" section above for complete list of valid colors. DO NOT USE ANY OTHER COLORS.
 - Wait times: self.wait(seconds)
 
 ## CRITICAL - DO NOT RENDER CODE AS TEXT:
