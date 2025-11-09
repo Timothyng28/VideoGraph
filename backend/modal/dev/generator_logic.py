@@ -303,6 +303,7 @@ def generate_educational_video_logic(
 
         # Initialize TTS service and audio directory for later use
         import asyncio
+
         from services.tts import ElevenLabsTimedService
         
         tts_service = ElevenLabsTimedService(
