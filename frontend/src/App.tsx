@@ -42,6 +42,12 @@ import {
  */
 type AppState = "landing" | "learning" | "error" | "closing";
 
+interface PendingTopicRequest {
+  topic: string;
+  imageData?: string;
+  imageFileName?: string;
+}
+
 /**
  * Main App Component
  */
@@ -53,6 +59,8 @@ export const App: React.FC = () => {
 
   // Cached session from localStorage
   const [cachedSession, setCachedSession] = useState<VideoSession | null>(null);
+  const [pendingTopicRequest, setPendingTopicRequest] =
+    useState<PendingTopicRequest | null>(null);
 
   // Reference to the video element for programmatic control
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -197,6 +205,37 @@ export const App: React.FC = () => {
       ? "Explain this image"
       : topic;
 
+    const existingSession = cachedSession ?? loadVideoSession();
+
+    if (existingSession && existingSession.tree.nodes.size > 0) {
+      let sessionToUse: VideoSession = existingSession;
+
+      if (voiceId && existingSession.context.voiceId !== voiceId) {
+        sessionToUse = {
+          ...existingSession,
+          context: {
+            ...existingSession.context,
+            voiceId,
+          },
+        };
+      }
+
+      if (!cachedSession || sessionToUse !== cachedSession) {
+        setCachedSession(sessionToUse);
+      }
+
+      setPendingTopicRequest({
+        topic: finalTopic,
+        imageData: imageData || undefined,
+        imageFileName: imageFileName || undefined,
+      });
+      setCurrentTopic(finalTopic);
+      setIsTestMode(false);
+      setAppState("learning");
+      setError("");
+      return;
+    }
+
     // Try to load from cache using the generated cache key
     if (hasCachedSession(cacheKey)) {
       console.log("Attempting to load cached session for:", cacheKey);
@@ -210,7 +249,18 @@ export const App: React.FC = () => {
 
       if (cached) {
         console.log("✅ Successfully loaded cached session for:", cacheKey);
-        setCachedSession(cached);
+        if (voiceId && cached.context.voiceId !== voiceId) {
+          setCachedSession({
+            ...cached,
+            context: {
+              ...cached.context,
+              voiceId,
+            },
+          });
+        } else {
+          setCachedSession(cached);
+        }
+        setPendingTopicRequest(null);
         setCurrentTopic(finalTopic);
         setIsTestMode(false);
         setAppState("learning");
@@ -225,6 +275,7 @@ export const App: React.FC = () => {
 
     // No cached session available or failed to load - generate fresh
     clearVideoSession(); // Clear localStorage to force fresh generation
+    setPendingTopicRequest(null);
 
     // Create a new session with the final topic
     const newSession = createVideoSession(finalTopic);
@@ -280,10 +331,23 @@ export const App: React.FC = () => {
     resetClosingQuestionState();
     resetLeafQuestionState();
     setHasSeenFirstVideo(false); // Reset video tracking
-    clearVideoSession(); // Clear localStorage
-    setCachedSession(null); // Clear cached session
+
+    const latestSession = loadVideoSession();
+    if (latestSession) {
+      setCachedSession(latestSession);
+      const latestTopic =
+        latestSession.context.initialTopic ||
+        latestSession.context.historyTopics?.[
+          latestSession.context.historyTopics.length - 1
+        ] ||
+        "";
+      if (latestTopic) {
+        setCurrentTopic(latestTopic);
+      }
+    }
+
+    setPendingTopicRequest(null);
     setAppState("landing");
-    setCurrentTopic("");
     setError("");
     setIsTestMode(false); // Reset test mode
   };
@@ -527,6 +591,24 @@ export const App: React.FC = () => {
             ]);
 
             // IMPORTANT: Call all hooks BEFORE any conditional returns
+            useEffect(() => {
+              if (!pendingTopicRequest) {
+                return;
+              }
+
+              const request = pendingTopicRequest;
+              setPendingTopicRequest(null);
+              void requestNewTopic(
+                request.topic,
+                request.imageData,
+                request.imageFileName
+              );
+            }, [
+              pendingTopicRequest,
+              requestNewTopic,
+              setPendingTopicRequest,
+            ]);
+
             // Effect to restart video when segment changes
             useEffect(() => {
               if (

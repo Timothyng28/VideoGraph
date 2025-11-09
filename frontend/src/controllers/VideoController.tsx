@@ -96,7 +96,11 @@ export interface VideoControllerState {
   loadCachedTopic: (topic: string) => Promise<void>;
   handleAnswer: (answer: string) => Promise<void>;
   requestNextSegment: () => Promise<void>;
-  requestNewTopic: (topic: string) => Promise<void>;
+  requestNewTopic: (
+    topic: string,
+    imageData?: string,
+    imageFilename?: string
+  ) => Promise<void>;
   navigateToNode: (nodeId: string) => void;
   handleCachedQuestionBranch: (question: string, matchedTopic: string) => Promise<void>;
   handleQuestionBranch: (question: string) => Promise<void>;
@@ -293,9 +297,7 @@ export const VideoController: React.FC<VideoControllerProps> = ({
   const [activeGenerations, setActiveGenerations] = useState<
     GenerationRequest[]
   >([]);
-  const [mostRecentGenerationId, setMostRecentGenerationId] = useState<
-    string | null
-  >(null);
+  const [, setMostRecentGenerationId] = useState<string | null>(null);
 
   // Track in-progress questions to prevent duplicates
   const processingQuestionsRef = useRef<Set<string>>(new Set());
