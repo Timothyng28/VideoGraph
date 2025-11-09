@@ -548,7 +548,10 @@ export const HomePage: React.FC = () => {
                 // Leaf video detected - create question node
                 console.log("Leaf video ended, creating question node");
                 createQuestionNode(session.tree.currentNodeId);
-              } else if (isAutoPlayEnabled && !(currentSegment.isQuestionNode ?? false)) {
+              } else if (
+                isAutoPlayEnabled &&
+                !(currentSegment.isQuestionNode ?? false)
+              ) {
                 // Auto-advance to next node (only for video nodes, not question nodes)
                 const nextNode = getNextNode(
                   session.tree,
@@ -963,7 +966,7 @@ export const HomePage: React.FC = () => {
                         maxWidth: "1280px",
                       }}
                     >
-                      {(currentSegment.isQuestionNode ?? false) ? (
+                      {currentSegment.isQuestionNode ?? false ? (
                         <div
                           className="flex items-center justify-center bg-gradient-to-br from-yellow-900/30 to-slate-900"
                           style={{ width: "100%", height: "450px" }}
