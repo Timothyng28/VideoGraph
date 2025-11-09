@@ -7,9 +7,10 @@
  * - /graph - Full-screen graph view
  */
 
-import { Routes, Route } from "react-router-dom";
-import { HomePage } from "./pages/HomePage";
+import { Route, Routes } from "react-router-dom";
+import { GraphNodePage } from "./pages/GraphNodePage";
 import { GraphPage } from "./pages/GraphPage";
+import { HomePage } from "./pages/HomePage";
 
 /**
  * Main App Component with Routing
@@ -19,6 +20,7 @@ export const App: React.FC = () => {
     <Routes>
       <Route path="/" element={<HomePage />} />
       <Route path="/graph" element={<GraphPage />} />
+      <Route path="/graph/:nodeId" element={<GraphNodePage />} />
     </Routes>
   );
 };

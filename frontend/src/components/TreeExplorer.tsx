@@ -52,13 +52,17 @@ const ExplorerNode = ({ data }: NodeProps) => {
       className="relative flex flex-col items-center gap-2"
       onMouseEnter={() => setShowTooltip(true)}
       onMouseLeave={() => setShowTooltip(false)}
-      style={{ zIndex: 1 }}
+      style={{
+        zIndex: 1,
+        cursor: "pointer",
+        pointerEvents: "all",
+      }}
     >
       {/* Connection handles */}
       <Handle type="target" position={Position.Left} style={{ opacity: 0 }} />
 
       {/* Node display - either thumbnail or circle */}
-      <div className="relative">
+      <div className="relative" style={{ pointerEvents: "none" }}>
         {/* Yellow ring for question nodes - unclickable and always visible */}
         {(data as any).isQuestionNode && (
           <div
@@ -100,10 +104,11 @@ const ExplorerNode = ({ data }: NodeProps) => {
               }
               className="w-full h-full object-cover"
               onError={() => setImageError(true)}
+              style={{ pointerEvents: "none" }}
             />
             {/* Node number badge on thumbnail */}
             <div
-              className="absolute top-1 left-1 w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold text-white shadow-md"
+              className="absolute top-1 left-1 w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold text-white shadow-md pointer-events-none"
               style={{ backgroundColor: (data as any).nodeColor || "#3b82f6" }}
             >
               {(data as any).nodeNumber}
@@ -325,6 +330,8 @@ export const TreeExplorer: React.FC<TreeExplorerProps> = ({
     const currentNode = getCurrentNode(tree);
     const positions = calculateTreeLayout(tree);
 
+    console.log("TreeExplorer: isModal =", isModal);
+
     // Color palette matching the mini view
     const nodeColors = [
       "#3b82f6",
@@ -423,7 +430,8 @@ export const TreeExplorer: React.FC<TreeExplorerProps> = ({
               ? 1
               : 0.7,
         },
-        draggable: true,
+        // Only allow dragging in modal mode; in graph page mode, prioritize clicking
+        draggable: isModal,
       };
     });
 
@@ -483,10 +491,18 @@ export const TreeExplorer: React.FC<TreeExplorerProps> = ({
     }
     setNodes(newNodes);
     setEdges(newEdges);
-  }, [tree, tree.currentNodeId, highlightedNodeIds, setNodes, setEdges]);
+  }, [
+    tree,
+    tree.currentNodeId,
+    highlightedNodeIds,
+    isModal,
+    setNodes,
+    setEdges,
+  ]);
 
   const handleNodeClick: NodeMouseHandler = useCallback(
     (event, node) => {
+      console.log("TreeExplorer: Node clicked!", node.id);
       event.stopPropagation();
       onNodeClick(node.id);
     },
@@ -573,6 +589,15 @@ export const TreeExplorer: React.FC<TreeExplorerProps> = ({
           minZoom={0.3}
           maxZoom={2}
           proOptions={{ hideAttribution: true }}
+          nodesDraggable={isModal}
+          nodesConnectable={false}
+          elementsSelectable={true}
+          panOnDrag={[1, 2]}
+          selectionOnDrag={false}
+          panOnScroll={true}
+          zoomOnScroll={true}
+          zoomOnPinch={true}
+          zoomOnDoubleClick={false}
         >
           <Background color="#1a1a1a" gap={20} size={1} />
           <style>{`

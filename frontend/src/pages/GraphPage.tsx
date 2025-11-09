@@ -5,16 +5,40 @@
  * Displays the tree visualization with the left sidebar maintained.
  */
 
-import React from "react";
-import { useNavigate } from "react-router-dom";
+import React, { useEffect, useRef, useState } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import { InputOverlay } from "../components/InputOverlay";
 import { TreeExplorer } from "../components/TreeExplorer";
 import { VideoController } from "../controllers/VideoController";
 import { loadVideoSession } from "../types/TreeState";
 
+interface PendingGenerationInfo {
+  topic: string;
+  imageData?: string;
+  imageFileName?: string;
+}
+
+interface LocationState {
+  pendingGeneration?: PendingGenerationInfo;
+}
+
 export const GraphPage: React.FC = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const cachedSession = loadVideoSession();
+  const [pendingGeneration, setPendingGeneration] =
+    useState<PendingGenerationInfo | null>(null);
+  const processedGenerationRef = useRef(false);
+
+  // Extract pending generation from navigation state
+  useEffect(() => {
+    const state = location.state as LocationState;
+    if (state?.pendingGeneration && !processedGenerationRef.current) {
+      setPendingGeneration(state.pendingGeneration);
+      // Clear the navigation state to prevent re-triggering on refresh
+      navigate(location.pathname, { replace: true, state: {} });
+    }
+  }, [location, navigate]);
 
   // If no session exists, redirect to home
   if (!cachedSession) {
@@ -50,6 +74,27 @@ export const GraphPage: React.FC = () => {
           activeGenerations,
           removeGenerationRequest,
         }) => {
+          // Handle pending generation from navigation state
+          useEffect(() => {
+            if (
+              pendingGeneration &&
+              !processedGenerationRef.current &&
+              requestNewTopic
+            ) {
+              processedGenerationRef.current = true;
+              console.log(
+                "GraphPage: Processing pending generation:",
+                pendingGeneration.topic
+              );
+              requestNewTopic(
+                pendingGeneration.topic,
+                pendingGeneration.imageData,
+                pendingGeneration.imageFileName
+              );
+              // Clear pending generation after processing
+              setPendingGeneration(null);
+            }
+          }, [pendingGeneration, requestNewTopic]);
           return (
             <div className="relative w-full h-screen flex dot-bg">
               {/* Left Sidebar */}
@@ -78,6 +123,22 @@ export const GraphPage: React.FC = () => {
                     <span>Home</span>
                   </button>
                 </div>
+
+                {/* Generation Progress Banner */}
+                {(isGenerating || activeGenerations.length > 0) && (
+                  <div className="px-4 py-3 border-b border-slate-800/50 bg-blue-900/20">
+                    <div className="flex items-center gap-2">
+                      <div className="w-4 h-4 rounded-full border-2 border-blue-400 border-t-transparent animate-spin" />
+                      <div className="text-xs text-blue-400 font-semibold">
+                        {activeGenerations.length > 0
+                          ? `Generating ${activeGenerations.length} video${
+                              activeGenerations.length > 1 ? "s" : ""
+                            }...`
+                          : "Generating video..."}
+                      </div>
+                    </div>
+                  </div>
+                )}
 
                 {/* Topic Display */}
                 {currentSegment && (
@@ -114,6 +175,34 @@ export const GraphPage: React.FC = () => {
                       onNavigateToGeneration={navigateToNode}
                       onDismissGeneration={removeGenerationRequest}
                     />
+                  ) : isGenerating || activeGenerations.length > 0 ? (
+                    <div className="p-4">
+                      <div className="text-slate-300 text-sm mb-4">
+                        Preparing your learning experience...
+                      </div>
+                      {activeGenerations.length > 0 && (
+                        <div className="space-y-2">
+                          {activeGenerations.map((gen) => (
+                            <div
+                              key={gen.id}
+                              className="bg-slate-800/60 border border-slate-700/50 rounded-lg p-3"
+                            >
+                              <div className="flex items-center gap-2 mb-1">
+                                <div className="w-3 h-3 rounded-full border-2 border-blue-400 border-t-transparent animate-spin" />
+                                <span className="text-xs text-blue-400 font-semibold">
+                                  {gen.status === "pending"
+                                    ? "Queued"
+                                    : "Generating"}
+                                </span>
+                              </div>
+                              <p className="text-sm text-white break-words">
+                                {gen.prompt}
+                              </p>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
                   ) : (
                     <div className="p-4 text-slate-400 text-sm">
                       Loading session...
@@ -128,7 +217,8 @@ export const GraphPage: React.FC = () => {
                   <TreeExplorer
                     tree={session.tree}
                     onNodeClick={(nodeId) => {
-                      navigateToNode(nodeId);
+                      // Navigate to the video page for this node
+                      navigate(`/graph/${nodeId}`);
                     }}
                     onClose={() => navigate("/")}
                     isModal={false}

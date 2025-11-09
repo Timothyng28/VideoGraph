@@ -28,6 +28,7 @@ import {
   getNextNode,
   getPreviousNode,
   loadVideoSession,
+  saveVideoSession,
 } from "../types/TreeState";
 import {
   ClosingQuestionPayload,
@@ -123,12 +124,11 @@ export const HomePage: React.FC = () => {
   const [isGeneratingFollowUp, setIsGeneratingFollowUp] = useState(false);
 
   /**
-   * Check for cached session on mount
-   * If found, skip landing page and go directly to learning state
+   * Load cached session on mount (but don't navigate away from landing page)
    */
   useEffect(() => {
     const cached = loadVideoSession();
-    if (cached) {
+    if (cached && cached.tree.nodes.size > 0) {
       console.log("Loaded cached session from localStorage");
       console.log("Cached tree has", cached.tree.nodes.size, "nodes");
       console.log("Saved current node ID:", cached.tree.currentNodeId);
@@ -158,8 +158,7 @@ export const HomePage: React.FC = () => {
       }
 
       setCachedSession(cached);
-      setCurrentTopic(cached.context.initialTopic || "Cached Session");
-      setAppState("learning");
+      // Don't navigate - user stays on landing page by default
     }
   }, []);
 
@@ -206,9 +205,6 @@ export const HomePage: React.FC = () => {
     const existingSession = cachedSession ?? loadVideoSession();
 
     if (existingSession && existingSession.tree.nodes.size > 0) {
-      const requestId = `${Date.now()}_${Math.random()
-        .toString(36)
-        .slice(2, 8)}`;
       let sessionToUse: VideoSession = existingSession;
 
       if (voiceId && (existingSession.context as any).voiceId !== voiceId) {
@@ -223,17 +219,19 @@ export const HomePage: React.FC = () => {
 
       if (!cachedSession || sessionToUse !== cachedSession) {
         setCachedSession(sessionToUse);
+        saveVideoSession(sessionToUse);
       }
 
-      setPendingTopicRequest({
-        id: requestId,
-        topic: finalTopic,
-        imageData: imageData || undefined,
-        imageFileName: imageFileName || undefined,
+      // Navigate to graph page with pending generation info
+      navigate("/graph", {
+        state: {
+          pendingGeneration: {
+            topic: finalTopic,
+            imageData: imageData || undefined,
+            imageFileName: imageFileName || undefined,
+          },
+        },
       });
-      setCurrentTopic(finalTopic);
-      setAppState("learning");
-      setError("");
       return;
     }
 
@@ -251,20 +249,23 @@ export const HomePage: React.FC = () => {
       if (cached) {
         console.log("✅ Successfully loaded cached session for:", cacheKey);
         if (voiceId && (cached.context as any).voiceId !== voiceId) {
-          setCachedSession({
+          const updatedSession = {
             ...cached,
             context: {
               ...cached.context,
               voiceId,
             } as any,
-          });
+          };
+          setCachedSession(updatedSession);
+          saveVideoSession(updatedSession);
         } else {
           setCachedSession(cached);
+          saveVideoSession(cached);
         }
         setPendingTopicRequest(null);
         setCurrentTopic(finalTopic);
-        setAppState("learning");
-        setError("");
+        // Navigate to graph page instead of learning state
+        navigate("/graph");
         return; // Successfully loaded cached session, skip generation
       } else {
         console.warn(
@@ -274,7 +275,6 @@ export const HomePage: React.FC = () => {
     }
 
     // No cached session available or failed to load - generate fresh
-    // Note: We don't clear the session here as it might be useful to keep
     setPendingTopicRequest(null);
 
     // Create a new session with the final topic
@@ -284,9 +284,19 @@ export const HomePage: React.FC = () => {
     }
 
     setCachedSession(newSession);
+    saveVideoSession(newSession);
     setCurrentTopic(finalTopic);
-    setAppState("learning");
-    setError("");
+
+    // Navigate to graph page with pending generation info
+    navigate("/graph", {
+      state: {
+        pendingGeneration: {
+          topic: finalTopic,
+          imageData: imageData || undefined,
+          imageFileName: imageFileName || undefined,
+        },
+      },
+    });
   };
 
   /**
