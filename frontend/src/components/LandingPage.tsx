@@ -12,10 +12,17 @@ interface LandingPageProps {
   onTestMode?: () => void; // NEW: For testing with hardcoded data
 }
 
+// Available voices for selection
+const AVAILABLE_VOICES = [
+  { id: 'pqHfZKP75CvOlQylNhV4', name: 'Male Voice' },
+  { id: 'XfNU2rGpBa01ckF309OY', name: 'Female Voice' },
+  // Add more voices here as needed
+];
+
 export const LandingPage: React.FC<LandingPageProps> = ({ onSubmit, onTestMode }) => {
   const [topic, setTopic] = useState('');
   const [isFocused, setIsFocused] = useState(false);
-  const [selectedVoice, setSelectedVoice] = useState<string>('pqHfZKP75CvOlQylNhV4'); // Default male voice
+  const [selectedVoice, setSelectedVoice] = useState<string>(AVAILABLE_VOICES[0].id); // Default to first voice
   
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -120,29 +127,38 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onSubmit, onTestMode }
           
           {/* Voice Selection */}
           <div className="mt-6 pt-6 border-t border-slate-700/50">
-            <p className="text-slate-400 text-sm mb-3 text-center">Select Voice:</p>
-            <div className="flex justify-center gap-3">
-              <button
-                onClick={() => setSelectedVoice('pqHfZKP75CvOlQylNhV4')}
-                className={`px-6 py-3 rounded-lg text-sm font-medium transition-all duration-200 ${
-                  selectedVoice === 'pqHfZKP75CvOlQylNhV4'
-                    ? 'bg-blue-600 text-white shadow-lg'
-                    : 'bg-slate-800/50 hover:bg-slate-700/70 text-slate-300 hover:text-white border border-slate-700'
-                }`}
-              >
-                🎙️ Male Voice
-              </button>
-              <button
-                onClick={() => setSelectedVoice('XfNU2rGpBa01ckF309OY')}
-                className={`px-6 py-3 rounded-lg text-sm font-medium transition-all duration-200 ${
-                  selectedVoice === 'XfNU2rGpBa01ckF309OY'
-                    ? 'bg-blue-600 text-white shadow-lg'
-                    : 'bg-slate-800/50 hover:bg-slate-700/70 text-slate-300 hover:text-white border border-slate-700'
-                }`}
-              >
-                🎤 Female Voice
-              </button>
+            <label htmlFor="voice-select" className="block text-slate-400 text-sm mb-3 text-center font-medium">
+              Voice Selection
+            </label>
+            <div className="flex justify-center">
+              <div className="relative inline-block">
+                <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                  <svg className="h-5 w-5 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
+                  </svg>
+                </div>
+                <select
+                  id="voice-select"
+                  value={selectedVoice}
+                  onChange={(e) => setSelectedVoice(e.target.value)}
+                  className="appearance-none pl-12 pr-10 py-4 rounded-xl text-base font-medium bg-slate-800/70 text-white border-2 border-slate-700/70 hover:border-blue-500/60 focus:border-blue-500 focus:outline-none focus:ring-4 focus:ring-blue-500/20 transition-all duration-300 cursor-pointer backdrop-blur-md shadow-lg hover:shadow-xl hover:bg-slate-800/90 min-w-[240px]"
+                >
+                  {AVAILABLE_VOICES.map((voice) => (
+                    <option key={voice.id} value={voice.id}>
+                      {voice.name}
+                    </option>
+                  ))}
+                </select>
+                <div className="absolute inset-y-0 right-0 pr-4 flex items-center pointer-events-none">
+                  <svg className="h-5 w-5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                  </svg>
+                </div>
+              </div>
             </div>
+            <p className="text-slate-500 text-xs mt-2 text-center">
+              Choose the voice for your video narration
+            </p>
           </div>
           
           {/* ===== TEST BUTTON - EASILY REMOVABLE ===== */}
