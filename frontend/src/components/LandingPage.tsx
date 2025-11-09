@@ -7,7 +7,10 @@
 import React, { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useImageUpload } from "../hooks/useImageUpload";
-import { hasCachedSession } from "../services/cachedSessionService";
+import {
+  hasCachedSession,
+  loadCachedSession,
+} from "../services/cachedSessionService";
 import { loadVideoSession } from "../types/TreeState";
 import { ImagePreview } from "./ImagePreview";
 
@@ -38,12 +41,44 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onSubmit }) => {
     AVAILABLE_VOICES[0].id
   ); // Default to first voice
   const [hasActiveSession, setHasActiveSession] = useState(false);
+  const [thumbnailUrls, setThumbnailUrls] = useState<Record<string, string>>(
+    {}
+  );
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Check for active session on mount
   useEffect(() => {
     const session = loadVideoSession();
     setHasActiveSession(!!session && session.tree.nodes.size > 0);
+  }, []);
+
+  // Load thumbnail URLs from cached sessions
+  useEffect(() => {
+    const loadThumbnails = async () => {
+      const thumbnails: Record<string, string> = {};
+
+      for (const topic of exampleTopics) {
+        const session = await loadCachedSession(topic);
+        if (session && session.tree.nodes.size > 0) {
+          // Get the first node (root) from the tree
+          const tree = session.tree as any;
+          const rootIds = tree.rootIds || [];
+          if (rootIds.length > 0) {
+            const rootId = rootIds[0];
+            const rootNode = session.tree.nodes.get(rootId);
+            const segment = rootNode?.segment as any;
+            const thumbnailUrl = segment?.thumbnailUrl;
+            if (thumbnailUrl && typeof thumbnailUrl === "string") {
+              thumbnails[topic] = thumbnailUrl;
+            }
+          }
+        }
+      }
+
+      setThumbnailUrls(thumbnails);
+    };
+
+    loadThumbnails();
   }, []);
 
   // Image upload functionality
@@ -292,38 +327,88 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onSubmit }) => {
           </div>
         </form>
 
-        {/* Example Topics */}
+        {/* Example Topics - Card Style */}
         <div
           className="animate-fade-in px-2"
           style={{ animationDelay: "0.8s" }}
         >
-          <p className="text-slate-500 text-xs sm:text-sm mb-3 sm:mb-4 text-center">
-            Or try one of these:
+          <p className="text-slate-400 text-sm sm:text-base mb-8 text-center font-medium">
+            Or explore these topics:
           </p>
-          <div className="flex flex-wrap justify-center gap-2 sm:gap-3">
-            {exampleTopics.map((example) => {
+          <div className="flex justify-center items-center min-h-[280px] sm:min-h-[320px] relative">
+            {exampleTopics.map((example, index) => {
               const isCached = hasCachedSession(example);
+              const thumbnailUrl = thumbnailUrls[example];
+
+              // Calculate rotation and position for overlap effect
+              const rotations = ["-8deg", "2deg", "-4deg"];
+              const zIndexes = [1, 3, 2];
+              // Increased spacing to span full width of search bar
+              const translations = [
+                "translateX(240px)",
+                "translateX(0px)",
+                "translateX(-240px)",
+              ];
+
               return (
                 <button
                   key={example}
                   onClick={() => handleExampleClick(example)}
-                  className={`px-3 sm:px-4 py-2 rounded-lg text-xs sm:text-sm transition-all duration-200 backdrop-blur-sm relative group ${
-                    isCached
-                      ? "bg-gradient-to-r from-blue-600/20 to-purple-600/20 hover:from-blue-600/30 hover:to-purple-600/30 text-blue-300 hover:text-blue-200 border border-blue-500/50 hover:border-blue-400/70"
-                      : "bg-slate-800/50 hover:bg-slate-700/70 text-slate-300 hover:text-white border border-slate-700 hover:border-blue-500/50"
-                  }`}
+                  className="absolute group cursor-pointer"
+                  style={{
+                    transform: `${translations[index]} rotate(${rotations[index]})`,
+                    zIndex: zIndexes[index],
+                    transition: "all 0.3s ease-out",
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.transform = `${translations[index]} rotate(0deg) scale(1.05)`;
+                    e.currentTarget.style.zIndex = "10";
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.transform = `${translations[index]} rotate(${rotations[index]}) scale(1)`;
+                    e.currentTarget.style.zIndex = String(zIndexes[index]);
+                  }}
                   title={
                     isCached
-                      ? "Instant playback - Pre-loaded"
+                      ? "⚡ Instant playback - Pre-loaded"
                       : "Will generate on demand"
                   }
                 >
-                  {isCached && (
-                    <span className="inline-block mr-1.5 text-blue-400">
-                      ⚡
-                    </span>
-                  )}
-                  {example}
+                  <div className="bg-white rounded-2xl shadow-2xl overflow-hidden w-[240px] sm:w-[280px] hover:shadow-blue-500/20 transition-shadow duration-300 border-4 border-white">
+                    {/* Thumbnail */}
+                    <div className="h-[140px] sm:h-[160px] w-full relative p-1">
+                      {thumbnailUrl ? (
+                        <img
+                          src={thumbnailUrl}
+                          alt={example}
+                          className="w-full h-full object-cover rounded-xl"
+                        />
+                      ) : (
+                        // Fallback placeholder while loading
+                        <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-slate-300 to-slate-400 rounded-xl">
+                          <div className="text-slate-500 text-sm">
+                            Loading...
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Cached indicator badge */}
+                      {isCached && (
+                        <div className="absolute top-4 right-4 bg-white/90 backdrop-blur-sm px-2 py-1 rounded-full shadow-lg">
+                          <span className="text-xs font-bold text-blue-600">
+                            ⚡ Ready
+                          </span>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Title */}
+                    <div className="p-4 sm:p-5">
+                      <h3 className="text-slate-800 font-bold text-base sm:text-lg text-center">
+                        {example}
+                      </h3>
+                    </div>
+                  </div>
                 </button>
               );
             })}
