@@ -27,6 +27,8 @@ RENDER_SECRETS = [
     "elevenlabs-key",  # For TTS
     "cerebras-key",  # For Cerebras LLM
     "gcp-credentials",  # For GCS uploads (contains GCP_SERVICE_ACCOUNT_JSON)
+    "google-api-key",  # For Gemini embeddings
+    "embedding-provider",  # Optional override for embedding provider
 ]
 
 MAIN_SECRETS = [
@@ -34,4 +36,6 @@ MAIN_SECRETS = [
     "elevenlabs-key",
     "cerebras-key",  # For Cerebras LLM
     "gcp-credentials",  # For GCS uploads (contains GCP_SERVICE_ACCOUNT_JSON)
+    "google-api-key",  # For Gemini embeddings
+    "embedding-provider",  # Optional override for embedding provider
 ]

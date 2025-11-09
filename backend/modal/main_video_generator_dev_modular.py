@@ -78,6 +78,7 @@ image = (
         "cerebras-cloud-sdk",
         "optillm",  # For CePO (Cerebras Planning & Optimization)
         "google-cloud-storage>=2.10.0",
+        "google-generativeai>=0.3.0",
         "sentence-transformers>=2.2.0",  # For semantic search embeddings
         "torch>=2.0.0",  # Required by sentence-transformers
     )
