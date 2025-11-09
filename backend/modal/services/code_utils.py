@@ -17,8 +17,7 @@ import re
 
 def remove_transcription_params(code: str, voice_id: str = None) -> str:
     """
-    Remove transcription_model and other problematic parameters from ElevenLabsService/ElevenLabsTimedService initialization.
-    Also fix PreGeneratedAudioService to ensure transcription_model=None.
+    Remove transcription_model and other problematic parameters from ElevenLabsTimedService initialization.
 
     This fixes the common error where manim-voiceover tries to prompt for missing
     transcription packages (whisper, stable_whisper) which aren't needed.
@@ -320,7 +319,7 @@ def remove_incompatible_methods(code: str) -> str:
 def remove_incorrect_imports(code: str) -> str:
     """
     Remove incorrect imports that don't exist in manim_voiceover.
-    Fix import paths for PreGeneratedAudioService and ElevenLabsService.
+    Fix import paths for ElevenLabsService.
     
     Args:
         code: Python code string
@@ -345,14 +344,9 @@ def remove_incorrect_imports(code: str) -> str:
             print("⚠️  Fixed ElevenLabsService import: using custom services.tts.ElevenLabsTimedService")
             filtered_lines.append('from services.tts import ElevenLabsTimedService')
             continue
-        # Fix incorrect PreGeneratedAudioService import path
-        if 'from manim_voiceover.services.tts.pregenerated import PreGeneratedAudioService' in line:
-            print("⚠️  Fixed PreGeneratedAudioService import path")
-            filtered_lines.append('from services.tts.pregenerated import PreGeneratedAudioService')
-            continue
-        # Fix any other manim_voiceover.services.tts imports
+        # Fix any manim_voiceover.services.tts imports (shouldn't be used)
         if 'from manim_voiceover.services.tts' in line:
-            print(f"⚠️  Fixed incorrect import path: {line.strip()}")
+            print(f"⚠️  Removed incorrect import path: {line.strip()}")
             # Replace with services.tts path
             fixed_line = line.replace('from manim_voiceover.services.tts', 'from services.tts')
             filtered_lines.append(fixed_line)

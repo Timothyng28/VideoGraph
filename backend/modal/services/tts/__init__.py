@@ -1,12 +1,11 @@
 """
 Text-to-Speech Services for Manim Pipeline
-ElevenLabs TTS service and Pre-generated audio service
+Simplified ElevenLabs TTS service with built-in retry logic
 """
 
-from .elevenlabs import ElevenLabsTimedService
-from .pregenerated import PreGeneratedAudioService
+from .elevenlabs import ElevenLabsTimedService, generate_voiceover
 
 __all__ = [
     'ElevenLabsTimedService',
-    'PreGeneratedAudioService'
+    'generate_voiceover'
 ]

@@ -339,26 +339,16 @@ def generate_educational_video_logic(
             "plan": mega_plan
         })
 
-        # Initialize TTS service and audio directory for later use
+        # Setup audio directory for voiceover generation
         import asyncio
-
-        from services.tts import ElevenLabsTimedService
         
         # Use provided voice_id or default to Ewen voice
         selected_voice_id = voice_id or "K80wneyktrw2rE11kA2W"
         capture_log(f"Using voice ID: {selected_voice_id}", "info")
         
-        tts_service = ElevenLabsTimedService(
-            voice_id=selected_voice_id,
-            transcription_model=None
-        )
-        
         audio_dir = work_dir / "voiceovers"
         audio_dir.mkdir(exist_ok=True)
         print(f"📁 Audio directory: {audio_dir}")
-        
-        # Initialize empty audio_map - will be populated after code generation
-        audio_map = {}
 
         # STAGE 2: Code Generation (Extract Scripts First)
         print(f"\n{'─'*60}")
@@ -724,60 +714,46 @@ Generate the fixed code now:"""
             "job_id": job_id
         })
         
-        async def generate_audio_from_script(section_num, script_text):
-            """Generate audio for a section using its actual extracted script."""
+        from services.tts import generate_voiceover
+        
+        # Generate audio for all sections (with retries built-in)
+        audio_results = {}
+        successful_audio = 0
+        
+        for section_num, script_text in section_scripts.items():
             try:
                 print(f"🎤 [Audio {section_num}] Generating from actual script...")
                 print(f"   Text length: {len(script_text)} characters")
                 print(f"   Preview: {script_text[:100]}...")
                 
-                # Generate audio using async API
-                audio_result = await tts_service.generate_from_text_async(
+                output_path = audio_dir / f"section_{section_num}.mp3"
+                
+                # Use the new simplified function with built-in retries
+                result = generate_voiceover(
                     text=script_text,
-                    cache_dir=str(audio_dir),
-                    path=f"section_{section_num}.mp3"
+                    output_path=str(output_path),
+                    voice_id=selected_voice_id,
+                    retries=3
                 )
                 
-                audio_path = audio_result.get('audio_path', '')
+                audio_path = result.get('audio_path', '')
                 if audio_path and Path(audio_path).exists():
                     file_size = Path(audio_path).stat().st_size / 1024  # KB
                     print(f"✅ [Audio {section_num}] Generated: {Path(audio_path).name} ({file_size:.2f} KB)")
-                    return (section_num, audio_path, script_text, None)
+                    audio_results[section_num] = {
+                        'audio_path': audio_path,
+                        'narration_text': script_text
+                    }
+                    successful_audio += 1
                 else:
                     print(f"⚠️  [Audio {section_num}] Audio generation failed")
-                    return (section_num, None, script_text, "Audio file not generated")
+                    audio_results[section_num] = None
                     
             except Exception as e:
                 print(f"❌ [Audio {section_num}] Audio generation error: {e}")
                 import traceback
                 print(traceback.format_exc())
-                return (section_num, None, script_text, str(e))
-        
-        async def generate_all_audio_from_scripts():
-            """Generate audio for all sections using actual scripts."""
-            print(f"🎯 Generating audio for {len(section_scripts)} sections...")
-            tasks = [
-                generate_audio_from_script(section_num, script)
-                for section_num, script in section_scripts.items()
-            ]
-            results = await asyncio.gather(*tasks)
-            return results
-        
-        audio_gen_results = asyncio.run(generate_all_audio_from_scripts())
-        
-        # Populate audio_map with actual scripts
-        successful_audio = 0
-        for section_num, audio_path, script_text, error in audio_gen_results:
-            if audio_path and not error:
-                audio_map[section_num] = {
-                    'audio_path': audio_path,
-                    'narration_text': script_text
-                }
-                successful_audio += 1
-                print(f"✓ Section {section_num} audio ready with actual script")
-            else:
-                print(f"⚠️  Section {section_num} audio failed: {error}")
-                audio_map[section_num] = None
+                audio_results[section_num] = None
         
         print(f"\n✓ Audio generation complete: {successful_audio} / {len(section_scripts)} sections")
         
@@ -815,118 +791,24 @@ Generate the fixed code now:"""
             "job_id": job_id
         })
         
-        # STAGE 3: Patch Code to Use Pre-Generated Audio
+        # STAGE 3: Rendering (audio already generated and available)
         print(f"\n{'─'*60}")
-        print("🔧 STAGE 3: Patching Code to Use Pre-Generated Audio")
+        print("🎬 STAGE 3: Rendering Sections")
         print(f"{'─'*60}\n")
-        
-        def patch_code_for_pregenerated_audio(code: str, section_num: int, narration_text: str) -> str:
-            """
-            Modify code to use PreGeneratedAudioService instead of ElevenLabsService.
-            """
-            # Replace ElevenLabsService import and usage with PreGeneratedAudioService
-            patched = code
-            
-            # Add PreGeneratedAudioService import if not present
-            if "PreGeneratedAudioService" not in patched:
-                # Find the import section
-                if "from services.tts" in patched or "from tts import" in patched:
-                    # Replace ElevenLabsService with PreGeneratedAudioService
-                    patched = patched.replace(
-                        "from tts import ElevenLabsTimedService",
-                        "from services.tts.pregenerated import PreGeneratedAudioService"
-                    )
-                    patched = patched.replace(
-                        "from services.tts import ElevenLabsTimedService",
-                        "from services.tts.pregenerated import PreGeneratedAudioService"
-                    )
-                else:
-                    # Add import after manim_voiceover import
-                    if "from manim_voiceover import VoiceoverScene" in patched:
-                        patched = patched.replace(
-                            "from manim_voiceover import VoiceoverScene",
-                            "from manim_voiceover import VoiceoverScene\nfrom services.tts.pregenerated import PreGeneratedAudioService"
-                        )
-            
-            # Replace set_speech_service call
-            import re
-            audio_path = f"/outputs/{job_id}/voiceovers/section_{section_num}.mp3"
-            
-            # Use selected voice_id
-            selected_voice_id = voice_id or "K80wneyktrw2rE11kA2W"
-            
-            # Pattern to match set_speech_service with ElevenLabsService
-            elevenlabs_pattern = r'self\.set_speech_service\(ElevenLabsTimedService\([^)]*\)\)'
-            replacement = f'self.set_speech_service(PreGeneratedAudioService(audio_file_path="{audio_path}", fallback_to_elevenlabs=True, voice_id="{selected_voice_id}")'
-            
-            patched = re.sub(elevenlabs_pattern, replacement, patched)
-            
-            # Also handle cases where it's split across lines or uses different formatting
-            if "ElevenLabsTimedService" in patched and "set_speech_service" in patched:
-                # More aggressive replacement
-                lines = patched.split('\n')
-                new_lines = []
-                in_tts_setup = False
-                skip_next = False
-                
-                for i, line in enumerate(lines):
-                    if skip_next:
-                        skip_next = False
-                        continue
-                        
-                    if "set_speech_service" in line and "ElevenLabsTimedService" in line:
-                        new_lines.append(f'        self.set_speech_service(PreGeneratedAudioService(audio_file_path="{audio_path}", fallback_to_elevenlabs=True, voice_id="{selected_voice_id}"))')
-                        in_tts_setup = False
-                    elif "set_speech_service" in line:
-                        # Multi-line set_speech_service
-                        in_tts_setup = True
-                        new_lines.append(f'        self.set_speech_service(PreGeneratedAudioService(audio_file_path="{audio_path}", fallback_to_elevenlabs=True, voice_id="{selected_voice_id}"))')
-                    elif in_tts_setup and ("ElevenLabsTimedService" in line or ")" in line):
-                        # Skip lines that are part of the old set_speech_service call
-                        in_tts_setup = ")" not in line
-                        continue
-                    else:
-                        new_lines.append(line)
-                        
-                patched = '\n'.join(new_lines)
-            
-            return patched
-        
-        # Patch all code variants to use pre-generated audio
-        patched_code_variants = {}
-        for section_num, code_variants in section_code_variants.items():
-            if section_num in audio_map and audio_map[section_num]:
-                # Audio available - patch code
-                narration_text = audio_map[section_num]['narration_text']
-                patched_variants = []
-                for variant_num, code in code_variants:
-                    patched_code = patch_code_for_pregenerated_audio(code, section_num, narration_text)
-                    patched_variants.append((variant_num, patched_code))
-                    print(f"✓ Section {section_num} V{variant_num}: Patched to use pre-generated audio")
-                patched_code_variants[section_num] = patched_variants
-            else:
-                # No audio - use original code with ElevenLabsService
-                print(f"⚠️  Section {section_num}: No pre-generated audio, using original code")
-                patched_code_variants[section_num] = code_variants
-        
-        print(f"✓ Patched {len(patched_code_variants)} sections to use pre-generated audio\n")
-        
-        # STAGE 4: Rendering with Correctly Matched Audio
-        print(f"\n{'─'*60}")
-        print("🎬 STAGE 4: Rendering with Matched Audio")
-        print(f"{'─'*60}\n")
+        print(f"   Audio files are already generated in: {audio_dir}")
+        print(f"   Manim will use ElevenLabsTimedService to generate voiceovers during rendering")
         
         yield update_job_progress({
             "status": "processing",
-            "stage": 4,
+            "stage": 3,
             "stage_name": "Rendering",
             "progress_percentage": 65,
-            "message": f"Rendering {len(patched_code_variants)} sections with matched audio...",
+            "message": f"Rendering {len(section_code_variants)} sections...",
             "job_id": job_id
         })
         
         async def render_section_with_variants(section_num, code_variants):
-            """Render a section using its code variants and pre-generated audio."""
+            """Render a section using its code variants."""
             try:
                 # Try rendering with fallback logic
                 success, video_path, error, gcs_upload_success = await try_render_with_fallback(section_num, code_variants, fix_attempt=0)
@@ -944,10 +826,10 @@ Generate the fixed code now:"""
         
         async def render_all_sections():
             """Render all sections with their code variants."""
-            print(f"🎯 Rendering {len(patched_code_variants)} sections...")
+            print(f"🎯 Rendering {len(section_code_variants)} sections...")
             tasks = [
                 render_section_with_variants(section_num, code_variants)
-                for section_num, code_variants in patched_code_variants.items()
+                for section_num, code_variants in section_code_variants.items()
             ]
             results = await asyncio.gather(*tasks)
             return results

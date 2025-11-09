@@ -132,14 +132,8 @@ def render_single_scene_logic(
                             error_summary.append("EOFError: Interactive prompt failed (likely transcription package issue)")
                     if 'importerror' in stderr_lower and 'create_voiceover_tracker' in stderr_lower:
                         error_summary.append("ImportError: create_voiceover_tracker doesn't exist in manim_voiceover (incorrect API usage)")
-                    if 'importerror' in stderr_lower and 'manim_voiceover.services.tts' in stderr_lower:
-                        error_summary.append("ImportError: PreGeneratedAudioService should be imported from services.tts.pregenerated, NOT manim_voiceover.services.tts")
                     if 'typeerror' in stderr_lower and 'vgroup' in stderr_lower and 'vmobject' in stderr_lower:
                         error_summary.append("TypeError: VGroup can only contain VMobject types. Use Group() for mixed types or non-VMobjects")
-                    if 'typeerror' in stderr_lower and 'abstract class' in stderr_lower and 'pregeneratedaudioservice' in stderr_lower:
-                        error_summary.append("TypeError: PreGeneratedAudioService missing abstract method. This is a code issue - PreGeneratedAudioService should have generate_from_text method.")
-                    if 'filenotfounderror' in stderr_lower and 'pre-generated audio file' in stderr_lower:
-                        error_summary.append("FileNotFoundError: Pre-generated audio file not found. PreGeneratedAudioService will fall back to ElevenLabsService if fallback_to_elevenlabs=True.")
                     if 'nameerror' in stderr_lower:
                         # Extract the undefined name
                         name_match = __import__('re').search(r"name '(\w+)' is not defined", result.stderr)
@@ -233,15 +227,9 @@ def render_single_scene_logic(
                         else:
                             error_analysis += "\n\nCRITICAL: EOFError detected. This happens when manim-voiceover tries to prompt for missing packages. Ensure transcription_model=None is set and never call set_transcription()."
                     if 'importerror' in stderr_lower and 'create_voiceover_tracker' in stderr_lower:
-                        error_analysis += f"\n\nCRITICAL: ImportError - create_voiceover_tracker doesn't exist in manim_voiceover. For pre-generated audio, use PreGeneratedAudioService from services.tts.pregenerated instead. Use VoiceoverScene with self.set_speech_service(PreGeneratedAudioService(audio_file_path=path, voice_id=\"{selected_voice_id}\"))."
-                    if 'importerror' in stderr_lower and 'manim_voiceover.services.tts' in stderr_lower:
-                        error_analysis += "\n\nCRITICAL: ImportError - PreGeneratedAudioService must be imported from services.tts.pregenerated, NOT from manim_voiceover.services.tts. Fix: from services.tts.pregenerated import PreGeneratedAudioService"
+                        error_analysis += f"\n\nCRITICAL: ImportError - create_voiceover_tracker doesn't exist in manim_voiceover. Use VoiceoverScene with self.set_speech_service(ElevenLabsTimedService(voice_id=\"{selected_voice_id}\", transcription_model=None))."
                     if 'typeerror' in stderr_lower and 'vgroup' in stderr_lower and 'vmobject' in stderr_lower:
                         error_analysis += "\n\nCRITICAL: TypeError - VGroup can only contain VMobject types. Replace VGroup() with Group() when adding non-VMobject types (like Sphere, Cube, Prism, or base Mobject instances)."
-                    if 'typeerror' in stderr_lower and 'abstract class' in stderr_lower and 'pregeneratedaudioservice' in stderr_lower:
-                        error_analysis += "\n\nCRITICAL: TypeError - PreGeneratedAudioService is missing abstract method generate_from_text. This should not happen - the service implementation needs to be fixed. As a workaround, use ElevenLabsService instead of PreGeneratedAudioService."
-                    if 'filenotfounderror' in stderr_lower and 'pre-generated audio file' in stderr_lower:
-                        error_analysis += "\n\nCRITICAL: FileNotFoundError - Pre-generated audio file not found. Ensure PreGeneratedAudioService is initialized with fallback_to_elevenlabs=True, or use ElevenLabsService directly if audio file doesn't exist."
                     if 'nameerror' in stderr_lower:
                         name_match = __import__('re').search(r"name '(\w+)' is not defined", result.stderr)
                         if name_match:
@@ -270,15 +258,14 @@ ERROR OUTPUT (stderr):
 {error_analysis}
 
 REQUIREMENTS:
-1. Use ElevenLabsService(voice_id="{selected_voice_id}", transcription_model=None) - NEVER use transcription_model or set_transcription()
-2. For pre-generated audio, use PreGeneratedAudioService from services.tts.pregenerated (NOT from manim_voiceover.services.tts)
-3. NEVER import create_voiceover_tracker - it doesn't exist in manim_voiceover
-4. NEVER use RecorderService - it causes EOFError prompts. Use ElevenLabsService instead.
-5. Replace VGroup() with Group() when mixing VMobject and non-VMobject types
-6. Remove ALL placeholders like {{tts_init}}, {{variable_name}}, etc.
-7. Remove calls to non-existent methods like check_overlap(), bounding_box, etc.
-8. Ensure all classes inherit from VoiceoverScene, not Scene
-9. Do NOT call set_transcription() anywhere
+1. Use ElevenLabsTimedService(voice_id="{selected_voice_id}", transcription_model=None) from services.tts - NEVER use transcription_model or set_transcription()
+2. NEVER import create_voiceover_tracker - it doesn't exist in manim_voiceover
+3. NEVER use RecorderService - it causes EOFError prompts. Use ElevenLabsTimedService instead.
+4. Replace VGroup() with Group() when mixing VMobject and non-VMobject types
+5. Remove ALL placeholders like {{tts_init}}, {{variable_name}}, etc.
+6. Remove calls to non-existent methods like check_overlap(), bounding_box, etc.
+7. Ensure all classes inherit from VoiceoverScene, not Scene
+8. Do NOT call set_transcription() anywhere
 
 Return ONLY the fixed Python code."""
 

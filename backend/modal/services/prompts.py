@@ -232,7 +232,6 @@ class ExplainerScene(Scene):
 ✅ **CORRECT**: For audio, ALWAYS use: `from services.tts import ElevenLabsTimedService` then `self.set_speech_service(ElevenLabsTimedService(voice_id="K80wneyktrw2rE11kA2W", transcription_model=None))`
 ❌ **NEVER USE**: `from manim_voiceover.services.elevenlabs import ElevenLabsService` - This module is NOT available in the container
 ⚠️ **IMPORTANT**: ALWAYS set `transcription_model=None` to disable transcription and avoid interactive prompts
-✅ **CORRECT**: For pre-generated audio, use: `from services.tts.pregenerated import PreGeneratedAudioService` (NOT from manim_voiceover.services.tts)
 
 ## CRITICAL - VGroup Usage Rules (MANDATORY):
 ❌ **NEVER USE**: `VGroup()` with non-VMobject types (Sphere, Cube, Prism, Cone, Cylinder, Mobject base class, or any 3D objects)

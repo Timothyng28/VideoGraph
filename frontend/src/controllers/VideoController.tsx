@@ -132,66 +132,8 @@ interface VideoControllerProps {
   initialTopic: string;
   onError?: (error: string) => void;
   children: (state: VideoControllerState) => React.ReactNode;
-  isTestMode?: boolean; // NEW: Use hardcoded test data instead of generating
   initialSession?: VideoSession; // NEW: Cached session to restore from localStorage
 }
-
-// ===== TEST DATA - EASILY REMOVABLE =====
-/**
- * Create hardcoded test session with 2 video segments in a tree
- * Uses public test videos from the internet
- */
-function createTestSession(topic: string): VideoSession {
-  // Create first segment
-  const segment1: VideoSegment = {
-    id: "test_segment_1",
-    manimCode: "",
-    duration: 30,
-    hasQuestion: true,
-    questionText:
-      "What are the three main types of machine learning mentioned?",
-    topic: topic,
-    difficulty: "medium",
-    generatedAt: new Date().toISOString(),
-    videoUrl:
-      "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4",
-    renderingStatus: "completed",
-  };
-
-  // Initialize tree with root
-  const tree = initializeTree(segment1);
-
-  // Add second segment as child
-  const segment2: VideoSegment = {
-    id: "test_segment_2",
-    manimCode: "",
-    duration: 30,
-    hasQuestion: false,
-    topic: topic,
-    difficulty: "medium",
-    generatedAt: new Date().toISOString(),
-    videoUrl:
-      "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4",
-    renderingStatus: "completed",
-  };
-
-  addChildNode(tree, tree.rootIds[0], segment2);
-
-  return {
-    tree,
-    context: {
-      initialTopic: topic,
-      historyTopics: [topic],
-      depth: 0,
-      correctnessPattern: [],
-      preferredStyle: "mixed",
-    },
-    sessionId: `test_session_${Date.now()}`,
-    startedAt: new Date().toISOString(),
-    lastUpdatedAt: new Date().toISOString(),
-  };
-}
-// ===== END TEST DATA =====
 
 /**
  * Helper function to enrich a segment with description and embedding
@@ -252,22 +194,17 @@ export const VideoController: React.FC<VideoControllerProps> = ({
   initialTopic,
   onError,
   children,
-  isTestMode = false, // Default to normal mode
   initialSession, // Cached session from localStorage
 }) => {
   // Session state
-  // ===== TEST MODE - EASILY REMOVABLE =====
   const [session, setSession] = useState<VideoSession>(() => {
-    // Priority: initialSession > testMode > new session
+    // Priority: initialSession > new session
     if (initialSession) {
       console.log("Using cached session from localStorage");
       return initialSession;
     }
-    return isTestMode
-      ? createTestSession(initialTopic)
-      : createVideoSession(initialTopic);
+    return createVideoSession(initialTopic);
   });
-  // ===== END TEST MODE =====
 
   // Loading states
   const [isGenerating, setIsGenerating] = useState(false);

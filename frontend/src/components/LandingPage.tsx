@@ -16,7 +16,6 @@ interface LandingPageProps {
     imageData?: string,
     imageFileName?: string
   ) => void;
-  onTestMode?: () => void; // NEW: For testing with hardcoded data
 }
 
 // Available voices for selection
@@ -31,7 +30,6 @@ const AVAILABLE_VOICES = [
 
 export const LandingPage: React.FC<LandingPageProps> = ({
   onSubmit,
-  onTestMode,
 }) => {
   const [topic, setTopic] = useState("");
   const [isFocused, setIsFocused] = useState(false);
@@ -90,25 +88,25 @@ export const LandingPage: React.FC<LandingPageProps> = ({
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900 flex items-center justify-center p-6">
+    <div className="min-h-screen bg-slate-950 flex items-center justify-center p-4 sm:p-6 md:p-8 checkered-bg">
       <div className="max-w-2xl w-full">
         {/* Main Content */}
-        <div className="text-center mb-12 space-y-6">
+        <div className="text-center mb-8 sm:mb-12 space-y-4 sm:space-y-6">
           {/* Title */}
-          <h1 className="text-6xl font-bold text-white mb-4 animate-fade-in">
+          <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-bold text-white mb-4 animate-fade-in lilita-one-regular">
             Learn Anything
           </h1>
 
           {/* Subtitle */}
           <p
-            className="text-2xl text-blue-300 animate-fade-in"
+            className="text-xl sm:text-2xl text-blue-300 animate-fade-in px-4"
             style={{ animationDelay: "0.2s" }}
           >
             What do you want to learn today?
           </p>
 
           <p
-            className="text-slate-400 max-w-lg mx-auto animate-fade-in"
+            className="text-sm sm:text-base text-slate-400 max-w-lg mx-auto animate-fade-in px-4"
             style={{ animationDelay: "0.4s" }}
           >
             Enter any topic and our AI will create a personalized, interactive
@@ -119,14 +117,14 @@ export const LandingPage: React.FC<LandingPageProps> = ({
         {/* Input Form */}
         <form
           onSubmit={handleSubmit}
-          className="mb-8 animate-fade-in"
+          className="mb-6 sm:mb-8 animate-fade-in px-2"
           style={{ animationDelay: "0.6s" }}
         >
           <div className="relative">
             {/* Drag and drop zone overlay */}
             {isDragging && (
               <div className="absolute inset-0 bg-blue-500/20 border-2 border-blue-500 border-dashed rounded-xl flex items-center justify-center z-10 pointer-events-none">
-                <p className="text-blue-300 font-semibold">Drop image here</p>
+                <p className="text-blue-300 font-semibold text-sm sm:text-base">Drop image here</p>
               </div>
             )}
 
@@ -140,7 +138,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
               onDragLeave={handleDragLeave}
               onDrop={handleDrop}
               placeholder="e.g., React Hooks, Quantum Physics... or drag an image"
-              className={`w-full px-6 py-5 text-lg bg-slate-800/50 backdrop-blur-sm text-white placeholder-slate-500 rounded-xl border-2 transition-all duration-300 focus:outline-none ${
+              className={`w-full px-4 sm:px-6 py-4 sm:py-5 text-base sm:text-lg bg-slate-800/50 backdrop-blur-sm text-white placeholder-slate-500 rounded-xl border-2 transition-all duration-300 focus:outline-none pr-28 sm:pr-32 ${
                 isFocused
                   ? "border-blue-500 shadow-lg shadow-blue-500/30"
                   : isDragging
@@ -153,7 +151,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
             <button
               type="submit"
               disabled={!topic.trim() && !imageData}
-              className={`absolute right-2 top-1/2 transform -translate-y-1/2 px-8 py-3 rounded-lg font-semibold transition-all duration-300 ${
+              className={`absolute right-2 top-1/2 transform -translate-y-1/2 px-4 sm:px-8 py-2 sm:py-3 rounded-lg font-semibold transition-all duration-300 text-sm sm:text-base ${
                 topic.trim() || imageData
                   ? "bg-blue-600 hover:bg-blue-700 text-white hover:scale-105 shadow-lg"
                   : "bg-slate-700 text-slate-500 cursor-not-allowed"
@@ -166,7 +164,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
           {/* File input and preview */}
           <div className="mt-4 space-y-3">
             {/* File input button */}
-            <div className="flex items-center gap-3">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-3">
               <input
                 ref={fileInputRef}
                 type="file"
@@ -177,7 +175,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
               <button
                 type="button"
                 onClick={() => fileInputRef.current?.click()}
-                className="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-slate-300 text-sm font-medium rounded-lg transition-colors flex items-center gap-2"
+                className="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-slate-300 text-sm font-medium rounded-lg transition-colors flex items-center gap-2 w-full sm:w-auto justify-center sm:justify-start"
               >
                 <svg
                   className="w-4 h-4"
@@ -194,7 +192,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                 </svg>
                 Attach Image
               </button>
-              <p className="text-xs text-slate-500">
+              <p className="text-xs text-slate-500 text-center sm:text-left">
                 Optional: Add an image for visual context
               </p>
             </div>
@@ -225,18 +223,18 @@ export const LandingPage: React.FC<LandingPageProps> = ({
         </form>
 
         {/* Example Topics */}
-        <div className="animate-fade-in" style={{ animationDelay: "0.8s" }}>
-          <p className="text-slate-500 text-sm mb-4 text-center">
+        <div className="animate-fade-in px-2" style={{ animationDelay: "0.8s" }}>
+          <p className="text-slate-500 text-xs sm:text-sm mb-3 sm:mb-4 text-center">
             Or try one of these:
           </p>
-          <div className="flex flex-wrap justify-center gap-3">
+          <div className="flex flex-wrap justify-center gap-2 sm:gap-3">
             {exampleTopics.map((example) => {
               const isCached = hasCachedSession(example);
               return (
                 <button
                   key={example}
                   onClick={() => handleExampleClick(example)}
-                  className={`px-4 py-2 rounded-lg text-sm transition-all duration-200 backdrop-blur-sm relative group ${
+                  className={`px-3 sm:px-4 py-2 rounded-lg text-xs sm:text-sm transition-all duration-200 backdrop-blur-sm relative group ${
                     isCached
                       ? "bg-gradient-to-r from-blue-600/20 to-purple-600/20 hover:from-blue-600/30 hover:to-purple-600/30 text-blue-300 hover:text-blue-200 border border-blue-500/50 hover:border-blue-400/70"
                       : "bg-slate-800/50 hover:bg-slate-700/70 text-slate-300 hover:text-white border border-slate-700 hover:border-blue-500/50"
@@ -259,18 +257,18 @@ export const LandingPage: React.FC<LandingPageProps> = ({
           </div>
 
           {/* Voice Selection */}
-          <div className="mt-6 pt-6 border-t border-slate-700/50">
+          <div className="mt-4 sm:mt-6 pt-4 sm:pt-6 border-t border-slate-700/50">
             <label
               htmlFor="voice-select"
-              className="block text-slate-400 text-sm mb-3 text-center font-medium"
+              className="block text-slate-400 text-xs sm:text-sm mb-3 text-center font-medium"
             >
               Voice Selection
             </label>
-            <div className="flex justify-center">
-              <div className="relative inline-block">
-                <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+            <div className="flex justify-center px-2">
+              <div className="relative inline-block w-full sm:w-auto">
+                <div className="absolute inset-y-0 left-0 pl-3 sm:pl-4 flex items-center pointer-events-none">
                   <svg
-                    className="h-5 w-5 text-blue-400"
+                    className="h-4 w-4 sm:h-5 sm:w-5 text-blue-400"
                     fill="none"
                     stroke="currentColor"
                     viewBox="0 0 24 24"
@@ -287,7 +285,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                   id="voice-select"
                   value={selectedVoice}
                   onChange={(e) => setSelectedVoice(e.target.value)}
-                  className="appearance-none pl-12 pr-10 py-4 rounded-xl text-base font-medium bg-slate-800/70 text-white border-2 border-slate-700/70 hover:border-blue-500/60 focus:border-blue-500 focus:outline-none focus:ring-4 focus:ring-blue-500/20 transition-all duration-300 cursor-pointer backdrop-blur-md shadow-lg hover:shadow-xl hover:bg-slate-800/90 min-w-[240px]"
+                  className="appearance-none pl-10 sm:pl-12 pr-8 sm:pr-10 py-3 sm:py-4 rounded-xl text-sm sm:text-base font-medium bg-slate-800/70 text-white border-2 border-slate-700/70 hover:border-blue-500/60 focus:border-blue-500 focus:outline-none focus:ring-4 focus:ring-blue-500/20 transition-all duration-300 cursor-pointer backdrop-blur-md shadow-lg hover:shadow-xl hover:bg-slate-800/90 w-full sm:min-w-[240px]"
                 >
                   {AVAILABLE_VOICES.map((voice) => (
                     <option key={voice.id} value={voice.id}>
@@ -295,9 +293,9 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                     </option>
                   ))}
                 </select>
-                <div className="absolute inset-y-0 right-0 pr-4 flex items-center pointer-events-none">
+                <div className="absolute inset-y-0 right-0 pr-3 sm:pr-4 flex items-center pointer-events-none">
                   <svg
-                    className="h-5 w-5 text-slate-400"
+                    className="h-4 w-4 sm:h-5 sm:w-5 text-slate-400"
                     fill="none"
                     stroke="currentColor"
                     viewBox="0 0 24 24"
@@ -312,37 +310,21 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                 </div>
               </div>
             </div>
-            <p className="text-slate-500 text-xs mt-2 text-center">
+            <p className="text-slate-500 text-xs mt-2 text-center px-2">
               Choose the voice for your video narration
             </p>
           </div>
-
-          {/* ===== TEST BUTTON - EASILY REMOVABLE ===== */}
-          {onTestMode && (
-            <div className="mt-6 pt-6 border-t border-slate-700/50">
-              <button
-                onClick={onTestMode}
-                className="w-full px-6 py-3 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white font-semibold rounded-lg transition-all duration-200 shadow-lg hover:shadow-xl hover:scale-[1.02]"
-              >
-                🧪 Test Mode: Pre-loaded 2-Segment Video
-              </button>
-              <p className="text-slate-500 text-xs mt-2 text-center">
-                Test with hardcoded video data (for development)
-              </p>
-            </div>
-          )}
-          {/* ===== END TEST BUTTON ===== */}
         </div>
 
         {/* Feature Highlights */}
         <div
-          className="mt-16 grid grid-cols-3 gap-6 animate-fade-in"
+          className="mt-8 sm:mt-12 md:mt-16 grid grid-cols-3 gap-3 sm:gap-4 md:gap-6 animate-fade-in px-2"
           style={{ animationDelay: "1s" }}
         >
           <div className="text-center">
-            <div className="w-12 h-12 bg-blue-500/20 rounded-full flex items-center justify-center mx-auto mb-3">
+            <div className="w-10 h-10 sm:w-12 sm:h-12 bg-blue-500/20 rounded-full flex items-center justify-center mx-auto mb-2 sm:mb-3">
               <svg
-                className="w-6 h-6 text-blue-400"
+                className="w-5 h-5 sm:w-6 sm:h-6 text-blue-400"
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"
@@ -355,13 +337,13 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                 />
               </svg>
             </div>
-            <p className="text-slate-400 text-sm">AI-Powered</p>
+            <p className="text-slate-400 text-xs sm:text-sm">AI-Powered</p>
           </div>
 
           <div className="text-center">
-            <div className="w-12 h-12 bg-purple-500/20 rounded-full flex items-center justify-center mx-auto mb-3">
+            <div className="w-10 h-10 sm:w-12 sm:h-12 bg-purple-500/20 rounded-full flex items-center justify-center mx-auto mb-2 sm:mb-3">
               <svg
-                className="w-6 h-6 text-purple-400"
+                className="w-5 h-5 sm:w-6 sm:h-6 text-purple-400"
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"
@@ -374,13 +356,13 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                 />
               </svg>
             </div>
-            <p className="text-slate-400 text-sm">Interactive</p>
+            <p className="text-slate-400 text-xs sm:text-sm">Interactive</p>
           </div>
 
           <div className="text-center">
-            <div className="w-12 h-12 bg-green-500/20 rounded-full flex items-center justify-center mx-auto mb-3">
+            <div className="w-10 h-10 sm:w-12 sm:h-12 bg-green-500/20 rounded-full flex items-center justify-center mx-auto mb-2 sm:mb-3">
               <svg
-                className="w-6 h-6 text-green-400"
+                className="w-5 h-5 sm:w-6 sm:h-6 text-green-400"
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"
@@ -393,12 +375,12 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                 />
               </svg>
             </div>
-            <p className="text-slate-400 text-sm">Personalized</p>
+            <p className="text-slate-400 text-xs sm:text-sm">Personalized</p>
           </div>
         </div>
       </div>
 
-      {/* Add CSS animation */}
+      {/* Add CSS animation and custom styles */}
       <style>{`
         @keyframes fade-in {
           from {
@@ -414,6 +396,23 @@ export const LandingPage: React.FC<LandingPageProps> = ({
         .animate-fade-in {
           animation: fade-in 0.6s ease-out forwards;
           opacity: 0;
+        }
+
+        .lilita-one-regular {
+          font-family: "Lilita One", system-ui;
+          font-weight: 400;
+          font-style: normal;
+        }
+
+        .checkered-bg {
+          background-color: #0f172a;
+          background-image: 
+            linear-gradient(45deg, #1e293b 25%, transparent 25%),
+            linear-gradient(-45deg, #1e293b 25%, transparent 25%),
+            linear-gradient(45deg, transparent 75%, #1e293b 75%),
+            linear-gradient(-45deg, transparent 75%, #1e293b 75%);
+          background-size: 20px 20px;
+          background-position: 0 0, 0 10px, 10px -10px, -10px 0px;
         }
       `}</style>
     </div>

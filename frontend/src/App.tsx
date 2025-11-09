@@ -110,10 +110,6 @@ export const App: React.FC = () => {
     setLeafEvaluationReasoning("");
   }, []);
 
-  // ===== TEST MODE - EASILY REMOVABLE =====
-  const [isTestMode, setIsTestMode] = useState(false);
-  // ===== END TEST MODE =====
-
   // Tree explorer modal state
   const [showTreeExplorer, setShowTreeExplorer] = useState(false);
 
@@ -233,7 +229,6 @@ export const App: React.FC = () => {
         imageFileName: imageFileName || undefined,
       });
       setCurrentTopic(finalTopic);
-      setIsTestMode(false);
       setAppState("learning");
       setError("");
       return;
@@ -265,7 +260,6 @@ export const App: React.FC = () => {
         }
         setPendingTopicRequest(null);
         setCurrentTopic(finalTopic);
-        setIsTestMode(false);
         setAppState("learning");
         setError("");
         return; // Successfully loaded cached session, skip generation
@@ -288,23 +282,9 @@ export const App: React.FC = () => {
 
     setCachedSession(newSession);
     setCurrentTopic(finalTopic);
-    setIsTestMode(false); // Normal mode
     setAppState("learning");
     setError("");
   };
-
-  // ===== TEST MODE - EASILY REMOVABLE =====
-  /**
-   * Handle test mode activation with hardcoded data
-   */
-  const handleTestMode = () => {
-    resetClosingQuestionState();
-    setCurrentTopic("Test Topic: Understanding Machine Learning");
-    setIsTestMode(true);
-    setAppState("learning");
-    setError("");
-  };
-  // ===== END TEST MODE =====
 
   /**
    * Handle errors from VideoController
@@ -352,7 +332,6 @@ export const App: React.FC = () => {
     setPendingTopicRequest(null);
     setAppState("landing");
     setError("");
-    setIsTestMode(false); // Reset test mode
   };
 
   const executeClosingQuestionRequest = useCallback(
@@ -465,7 +444,6 @@ export const App: React.FC = () => {
     return (
       <LandingPage
         onSubmit={handleTopicSubmit}
-        onTestMode={handleTestMode} // Pass test mode handler
       />
     );
   }
@@ -511,7 +489,6 @@ export const App: React.FC = () => {
         <VideoController
           initialTopic={currentTopic}
           onError={handleVideoError}
-          isTestMode={isTestMode} // Pass test mode flag
           initialSession={cachedSession || undefined} // Pass cached session if available
         >
           {({
