@@ -8,18 +8,19 @@ import React, { useState } from 'react';
 import { hasCachedSession } from '../services/cachedSessionService';
 
 interface LandingPageProps {
-  onSubmit: (topic: string) => void;
+  onSubmit: (topic: string, voiceId?: string) => void;
   onTestMode?: () => void; // NEW: For testing with hardcoded data
 }
 
 export const LandingPage: React.FC<LandingPageProps> = ({ onSubmit, onTestMode }) => {
   const [topic, setTopic] = useState('');
   const [isFocused, setIsFocused] = useState(false);
+  const [selectedVoice, setSelectedVoice] = useState<string>('pqHfZKP75CvOlQylNhV4'); // Default male voice
   
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (topic.trim()) {
-      onSubmit(topic.trim());
+      onSubmit(topic.trim(), selectedVoice);
     }
   };
   
@@ -33,7 +34,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onSubmit, onTestMode }
   const handleExampleClick = (exampleTopic: string) => {
     // Directly submit if cached, otherwise set input value
     if (hasCachedSession(exampleTopic)) {
-      onSubmit(exampleTopic);
+      onSubmit(exampleTopic, selectedVoice);
     } else {
       setTopic(exampleTopic);
     }
@@ -115,6 +116,33 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onSubmit, onTestMode }
                 </button>
               );
             })}
+          </div>
+          
+          {/* Voice Selection */}
+          <div className="mt-6 pt-6 border-t border-slate-700/50">
+            <p className="text-slate-400 text-sm mb-3 text-center">Select Voice:</p>
+            <div className="flex justify-center gap-3">
+              <button
+                onClick={() => setSelectedVoice('pqHfZKP75CvOlQylNhV4')}
+                className={`px-6 py-3 rounded-lg text-sm font-medium transition-all duration-200 ${
+                  selectedVoice === 'pqHfZKP75CvOlQylNhV4'
+                    ? 'bg-blue-600 text-white shadow-lg'
+                    : 'bg-slate-800/50 hover:bg-slate-700/70 text-slate-300 hover:text-white border border-slate-700'
+                }`}
+              >
+                🎙️ Male Voice
+              </button>
+              <button
+                onClick={() => setSelectedVoice('XfNU2rGpBa01ckF309OY')}
+                className={`px-6 py-3 rounded-lg text-sm font-medium transition-all duration-200 ${
+                  selectedVoice === 'XfNU2rGpBa01ckF309OY'
+                    ? 'bg-blue-600 text-white shadow-lg'
+                    : 'bg-slate-800/50 hover:bg-slate-700/70 text-slate-300 hover:text-white border border-slate-700'
+                }`}
+              >
+                🎤 Female Voice
+              </button>
+            </div>
           </div>
           
           {/* ===== TEST BUTTON - EASILY REMOVABLE ===== */}

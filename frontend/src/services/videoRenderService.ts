@@ -46,7 +46,8 @@ export interface GenerationProgress {
  */
 export async function generateVideoScenes(
   topic: string,
-  onProgress?: (progress: GenerationProgress) => void
+  onProgress?: (progress: GenerationProgress) => void,
+  voiceId?: string
 ): Promise<{
   success: boolean;
   sections?: string[];
@@ -59,16 +60,19 @@ export async function generateVideoScenes(
     "https://video-gen-2--main-video-generator-dev-generate-video-api.modal.run/";
 
   try {
-    console.log("Generating video scenes for topic:", topic);
+    console.log("Generating video scenes for topic:", topic, "with voice ID:", voiceId);
+
+    const requestBody: any = { topic: topic };
+    if (voiceId) {
+      requestBody.voice_id = voiceId;
+    }
 
     const response = await fetch(modalEndpoint, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({
-        topic: topic,
-      }),
+      body: JSON.stringify(requestBody),
     });
 
     if (!response.ok) {
