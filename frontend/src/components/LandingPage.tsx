@@ -7,18 +7,25 @@
 import React, { useState } from 'react';
 
 interface LandingPageProps {
-  onSubmit: (topic: string) => void;
+  onSubmit: (topic: string, voiceId?: string) => void;
   onTestMode?: () => void; // NEW: For testing with hardcoded data
 }
+
+// Available ElevenLabs voices
+const VOICE_OPTIONS = [
+  { id: 'XfNU2rGpBa01ckF309OY', name: 'Rachel (Default)' },
+  { id: 'pqHfZKP75CvOlQylNhV4', name: 'Bob' },
+];
 
 export const LandingPage: React.FC<LandingPageProps> = ({ onSubmit, onTestMode }) => {
   const [topic, setTopic] = useState('');
   const [isFocused, setIsFocused] = useState(false);
+  const [selectedVoiceId, setSelectedVoiceId] = useState(VOICE_OPTIONS[0].id);
   
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (topic.trim()) {
-      onSubmit(topic.trim());
+      onSubmit(topic.trim(), selectedVoiceId);
     }
   };
   
@@ -99,6 +106,27 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onSubmit, onTestMode }
                 {example}
               </button>
             ))}
+          </div>
+          
+          {/* Voice Selection */}
+          <div className="mt-6 pt-6 border-t border-slate-700/50">
+            <label className="block text-slate-400 text-sm mb-2">
+              Voice Selection
+            </label>
+            <select
+              value={selectedVoiceId}
+              onChange={(e) => setSelectedVoiceId(e.target.value)}
+              className="w-full px-4 py-3 bg-slate-800/50 backdrop-blur-sm text-white rounded-lg border-2 border-slate-700 hover:border-slate-600 focus:border-blue-500 focus:outline-none transition-all duration-200 cursor-pointer"
+            >
+              {VOICE_OPTIONS.map((voice) => (
+                <option key={voice.id} value={voice.id}>
+                  {voice.name}
+                </option>
+              ))}
+            </select>
+            <p className="text-slate-500 text-xs mt-2">
+              Choose the voice for video narration
+            </p>
           </div>
           
           {/* ===== TEST BUTTON - EASILY REMOVABLE ===== */}

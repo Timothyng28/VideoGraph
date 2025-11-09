@@ -15,7 +15,7 @@ import re
 # TTS Configuration Fixes (from code_cleanup.py)
 # ============================================================================
 
-def remove_transcription_params(code: str) -> str:
+def remove_transcription_params(code: str, voice_id: str = "XfNU2rGpBa01ckF309OY") -> str:
     """
     Remove transcription_model and other problematic parameters from ElevenLabsService initialization.
     Also fix PreGeneratedAudioService to ensure transcription_model=None.
@@ -25,6 +25,7 @@ def remove_transcription_params(code: str) -> str:
 
     Args:
         code: Python code string with Manim scene
+        voice_id: ElevenLabs voice ID to use (defaults to Bill)
 
     Returns:
         Cleaned code with problematic parameters removed
@@ -41,7 +42,7 @@ def remove_transcription_params(code: str) -> str:
     # Replace any voice_id with the correct one
     code = re.sub(
         r'ElevenLabsService\(\s*voice_id\s*=\s*[^,)]+',
-        'ElevenLabsService(voice_id="pqHfZKP75CvOlQylNhV4"',
+        f'ElevenLabsService(voice_id="{voice_id}"',
         code
     )
 
@@ -53,33 +54,33 @@ def remove_transcription_params(code: str) -> str:
     )
 
     # Pattern 4: Clean up any trailing commas and ADD voice_id + transcription_model=None
-    # ElevenLabsService(, ) -> ElevenLabsService(voice_id="pqHfZKP75CvOlQylNhV4", transcription_model=None)
-    # ElevenLabsService() -> ElevenLabsService(voice_id="pqHfZKP75CvOlQylNhV4", transcription_model=None)
+    # ElevenLabsService(, ) -> ElevenLabsService(voice_id="...", transcription_model=None)
+    # ElevenLabsService() -> ElevenLabsService(voice_id="...", transcription_model=None)
     code = re.sub(
         r'ElevenLabsService\(\s*,?\s*\)',
-        'ElevenLabsService(voice_id="pqHfZKP75CvOlQylNhV4", transcription_model=None)',
+        f'ElevenLabsService(voice_id="{voice_id}", transcription_model=None)',
         code
     )
 
     # Pattern 4b: Add transcription_model=None if only voice_id is present
     # ElevenLabsService(voice_id="...") -> ElevenLabsService(voice_id="...", transcription_model=None)
     code = re.sub(
-        r'ElevenLabsService\(voice_id="pqHfZKP75CvOlQylNhV4"\)',
-        'ElevenLabsService(voice_id="pqHfZKP75CvOlQylNhV4", transcription_model=None)',
+        rf'ElevenLabsService\(voice_id="{voice_id}"\)',
+        f'ElevenLabsService(voice_id="{voice_id}", transcription_model=None)',
         code
     )
 
     # Pattern 4c: Remove model parameter if present (we want default model)
     code = re.sub(
-        r'ElevenLabsService\(voice_id="pqHfZKP75CvOlQylNhV4",\s*model="[^"]*",?\s*',
-        'ElevenLabsService(voice_id="pqHfZKP75CvOlQylNhV4", ',
+        rf'ElevenLabsService\(voice_id="{voice_id}",\s*model="[^"]*",?\s*',
+        f'ElevenLabsService(voice_id="{voice_id}", ',
         code
     )
 
     # Pattern 5: Replace GTTSService with ElevenLabsService
     code = re.sub(
         r'GTTSService\([^)]*\)',
-        'ElevenLabsService(voice_id="pqHfZKP75CvOlQylNhV4", transcription_model=None)',
+        f'ElevenLabsService(voice_id="{voice_id}", transcription_model=None)',
         code
     )
 
@@ -235,13 +236,14 @@ def ensure_voiceover_imports(code: str) -> str:
     return '\n'.join(new_lines)
 
 
-def ensure_speech_service_init(code: str) -> str:
+def ensure_speech_service_init(code: str, voice_id: str = "XfNU2rGpBa01ckF309OY") -> str:
     """
     Ensure ElevenLabsService is initialized in construct() method if VoiceoverScene is used.
     NOTE: This should NOT add transcription_model parameter - that's handled by remove_transcription_params()
 
     Args:
         code: Python code string
+        voice_id: ElevenLabs voice ID to use (defaults to Bill)
 
     Returns:
         Code with speech service initialization
@@ -264,7 +266,7 @@ def ensure_speech_service_init(code: str) -> str:
         elif in_construct and line.strip() and not line.strip().startswith('#') and not service_added:
             # Add speech service initialization after first non-comment line in construct
             new_lines.append('        # Initialize ElevenLabs speech service for audio narration')
-            new_lines.append('        self.set_speech_service(ElevenLabsService())')
+            new_lines.append(f'        self.set_speech_service(ElevenLabsService(voice_id="{voice_id}", transcription_model=None))')
             print("⚠️  Added speech service initialization to construct method")
             service_added = True
             in_construct = False
@@ -351,12 +353,13 @@ def remove_incorrect_imports(code: str) -> str:
     return '\n'.join(filtered_lines)
 
 
-def remove_placeholders(code: str) -> str:
+def remove_placeholders(code: str, voice_id: str = "XfNU2rGpBa01ckF309OY") -> str:
     """
     Remove code generation placeholders like {tts_init}, {variable_name}, etc.
     
     Args:
         code: Python code string
+        voice_id: ElevenLabs voice ID to use (defaults to Bill)
         
     Returns:
         Code with placeholders removed or replaced
@@ -366,7 +369,7 @@ def remove_placeholders(code: str) -> str:
         print("⚠️  Found placeholder {tts_init}, replacing with ElevenLabsService initialization")
         code = code.replace(
             '{tts_init}',
-            'ElevenLabsService(voice_id="pqHfZKP75CvOlQylNhV4", transcription_model=None)'
+            f'ElevenLabsService(voice_id="{voice_id}", transcription_model=None)'
         )
     
     # Pattern: Any other {placeholder} - remove the line or replace with comment
@@ -601,29 +604,31 @@ def add_basic_voiceover_if_missing(code: str) -> str:
 # Main Entry Points
 # ============================================================================
 
-def clean_manim_code(code: str) -> str:
+def clean_manim_code(code: str, voice_id: str = "XfNU2rGpBa01ckF309OY") -> str:
     """
     Apply TTS configuration fixes to Manim code.
 
     Args:
         code: Raw generated Manim code
+        voice_id: ElevenLabs voice ID to use (defaults to Bill)
 
     Returns:
         Cleaned, ready-to-run Manim code with TTS fixes applied
     """
     # Apply all TTS cleanup functions
-    code = remove_transcription_params(code)
+    code = remove_transcription_params(code, voice_id)
     code = ensure_elevenlabs_import(code)
 
     return code
 
 
-def apply_all_manual_fixes(code: str) -> str:
+def apply_all_manual_fixes(code: str, voice_id: str = "XfNU2rGpBa01ckF309OY") -> str:
     """
     Apply scene structure and API compatibility fixes to Manim code.
 
     Args:
         code: Raw generated Manim code
+        voice_id: ElevenLabs voice ID to use (defaults to Bill)
 
     Returns:
         Code with all manual fixes applied
@@ -640,7 +645,8 @@ def apply_all_manual_fixes(code: str) -> str:
     code = remove_vgroup_with_non_vmobjects(code)
     code = fix_add_tip_parameters(code)  # Fix add_tip() invalid parameters
     code = fix_opacity_parameters(code)  # Fix opacity= parameter in constructors
-    code = ensure_speech_service_init(code)
+    code = remove_placeholders(code, voice_id)  # Remove placeholders with voice_id
+    code = ensure_speech_service_init(code, voice_id)
     code = add_basic_voiceover_if_missing(code)
 
     print("✓ Manual code fixes complete")

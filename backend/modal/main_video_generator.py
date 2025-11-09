@@ -28,7 +28,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 # ═══════════════════════════════════════════════════════════════════════════
 # CONFIGURATION - TTS provider
 # ═══════════════════════════════════════════════════════════════════════════
-ELEVENLABS_VOICE_ID = "pqHfZKP75CvOlQylNhV4"  # ElevenLabs voice
+ELEVENLABS_VOICE_ID = "XfNU2rGpBa01ckF309OY"  # ElevenLabs voice
 
 # Create Modal App
 app = modal.App("main-video-generator")
@@ -92,11 +92,19 @@ def render_single_scene(
     section_num: int,
     manim_code: str,
     work_dir_path: str,
-    job_id: str
+    job_id: str,
+    voice_id: str = "XfNU2rGpBa01ckF309OY"
 ) -> tuple:
     """
     Render a single Manim scene in its own container.
     Returns: (section_num, video_path, error)
+    
+    Args:
+        section_num: Section number (1-indexed)
+        manim_code: Python code for the Manim scene
+        work_dir_path: Path to working directory
+        job_id: Unique job identifier
+        voice_id: ElevenLabs voice ID to use (defaults to Rachel)
     """
     # Error logging removed - Supabase integration temporarily disabled
     import subprocess
@@ -104,9 +112,8 @@ def render_single_scene(
     from pathlib import Path
 
     sys.path.insert(0, '/root')
-    from code_cleanup import clean_manim_code
-    from llm import AnthropicClaudeService
-    from manual_code_helpers import apply_all_manual_fixes
+    from services.code_utils import clean_manim_code, apply_all_manual_fixes
+    from services.llm import AnthropicClaudeService
 
     work_dir = Path(work_dir_path)
     work_dir.mkdir(parents=True, exist_ok=True)
@@ -116,8 +123,8 @@ def render_single_scene(
     print(f"{'━'*60}")
 
     # Apply code cleanup
-    manim_code = clean_manim_code(manim_code)
-    manim_code = apply_all_manual_fixes(manim_code)
+    manim_code = clean_manim_code(manim_code, voice_id)
+    manim_code = apply_all_manual_fixes(manim_code, voice_id)
 
     # Save code
     code_file = work_dir / f"section_{section_num}.py"
@@ -243,8 +250,8 @@ Return ONLY the fixed Python code with the correct TTS service initialization.""
                     repaired_code = repaired_code.split('```')[1].split('```')[0].strip()
 
                 # Clean repaired code
-                repaired_code = clean_manim_code(repaired_code)
-                repaired_code = apply_all_manual_fixes(repaired_code)
+                repaired_code = clean_manim_code(repaired_code, voice_id)
+                repaired_code = apply_all_manual_fixes(repaired_code, voice_id)
 
                 current_file = work_dir / f"section_{section_num}_repaired.py"
                 current_file.write_text(repaired_code)
@@ -307,7 +314,8 @@ def generate_educational_video(
     prompt: str,
     job_id: Optional[str] = None,
     image_context: Optional[str] = None,
-    clerk_user_id: Optional[str] = None
+    clerk_user_id: Optional[str] = None,
+    voice_id: Optional[str] = None
 ):
     """
     Generate a complete educational video from a prompt with optional image context.
@@ -317,6 +325,7 @@ def generate_educational_video(
         job_id: Optional job ID for tracking
         image_context: Optional base64-encoded image to provide visual context
         clerk_user_id: Optional Clerk user ID to associate video with user account
+        voice_id: Optional ElevenLabs voice ID for narration
 
     Yields:
         Progress updates and final video URL
@@ -329,7 +338,7 @@ def generate_educational_video(
     from pathlib import Path
 
     sys.path.insert(0, '/root')
-    from prompts import MEGA_PLAN_PROMPT, get_manim_prompt
+    from services.prompts import MEGA_PLAN_PROMPT, get_manim_prompt
 
     # Configuration
     TEMP = 0.3
@@ -360,7 +369,7 @@ def generate_educational_video(
 
         # Initialize LLM service
         sys.path.insert(0, '/root')
-        from llm import AnthropicClaudeService, LLMMessage
+        from services.llm import AnthropicClaudeService, LLMMessage
 
         print("🔧 Initializing Claude Sonnet 4.5 service...")
         claude_service = AnthropicClaudeService(model="claude-sonnet-4-5-20250929")
@@ -499,7 +508,7 @@ def generate_educational_video(
                 print(f"📹 [Async {section_num}] Section {section_num}/{len(video_structure)}: {section['section']}")
                 print(f"{'━'*60}")
 
-                section_prompt = f"""{get_manim_prompt()}
+                section_prompt = f"""{get_manim_prompt(voice_id)}
 
 Topic: {prompt}
 Section: {section['section']} (Duration: {section['duration']})
@@ -564,16 +573,15 @@ Generate a SINGLE scene for this section only. The scene should be self-containe
 
                 # Clean the code to remove problematic parameters
                 sys.path.insert(0, '/root')
-                from code_cleanup import clean_manim_code
-                from manual_code_helpers import apply_all_manual_fixes
+                from services.code_utils import clean_manim_code, apply_all_manual_fixes
 
-                manim_code = clean_manim_code(manim_code)
-                manim_code = apply_all_manual_fixes(manim_code)
+                manim_code = clean_manim_code(manim_code, voice_id)
+                manim_code = apply_all_manual_fixes(manim_code, voice_id)
                 print(f"✓ [Async {section_num}] Code cleaned and fixed")
 
                 # IMMEDIATELY spawn render container (don't wait)
                 print(f"🚀 [Async {section_num}] Spawning Modal container for rendering (including ElevenLabs audio)...")
-                render_call = render_single_scene.spawn(section_num, manim_code, str(work_dir), job_id)
+                render_call = render_single_scene.spawn(section_num, manim_code, str(work_dir), job_id, voice_id or "XfNU2rGpBa01ckF309OY")
                 render_function_calls.append((section_num, render_call))
 
                 print(f"✓ [Async {section_num}] Render container spawned! Continuing to next section...")
@@ -892,6 +900,7 @@ async def generate_video_api(item: dict):
     job_id = item.get("job_id")
     image_context = item.get("image_context")  # Base64 encoded image
     clerk_user_id = item.get("clerk_user_id")  # Clerk user ID for user association
+    voice_id = item.get("voice_id")  # ElevenLabs voice ID
 
     # Log what we received
     print(f"📥 Received API request:")
@@ -946,7 +955,8 @@ async def generate_video_api(item: dict):
                 prompt=prompt,
                 job_id=job_id,
                 image_context=image_context,
-                clerk_user_id=clerk_user_id
+                clerk_user_id=clerk_user_id,
+                voice_id=voice_id
             ):
                 yield f"data: {json.dumps(update)}\n\n"
         except Exception as e:

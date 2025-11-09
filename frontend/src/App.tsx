@@ -42,6 +42,7 @@ export const App: React.FC = () => {
   const [appState, setAppState] = useState<AppState>("landing");
   const [currentTopic, setCurrentTopic] = useState<string>("");
   const [error, setError] = useState<string>("");
+  const [voiceId, setVoiceId] = useState<string | undefined>(undefined);
   
   // Cached session from localStorage
   const [cachedSession, setCachedSession] = useState<VideoSession | null>(null);
@@ -138,13 +139,14 @@ export const App: React.FC = () => {
   /**
    * Handle topic submission from landing page
    */
-  const handleTopicSubmit = async (topic: string) => {
+  const handleTopicSubmit = async (topic: string, selectedVoiceId?: string) => {
     resetClosingQuestionState();
     resetLeafQuestionState();
     setHasSeenFirstVideo(false); // Reset video tracking for new session
     clearVideoSession(); // Clear localStorage to force fresh generation
     setCachedSession(null); // Clear any cached session to force new generation
     setCurrentTopic(topic);
+    setVoiceId(selectedVoiceId);
     setIsTestMode(false); // Normal mode
     setAppState("learning");
     setError("");
@@ -351,6 +353,7 @@ export const App: React.FC = () => {
       <div className="relative w-full h-screen flex bg-slate-900">
         <VideoController
           initialTopic={currentTopic}
+          voiceId={voiceId}
           onError={handleVideoError}
           isTestMode={isTestMode} // Pass test mode flag
           initialSession={cachedSession || undefined} // Pass cached session if available

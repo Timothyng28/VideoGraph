@@ -108,6 +108,7 @@ export interface VideoControllerState {
 
 interface VideoControllerProps {
   initialTopic: string;
+  voiceId?: string; // ElevenLabs voice ID for narration
   onError?: (error: string) => void;
   children: (state: VideoControllerState) => React.ReactNode;
   isTestMode?: boolean; // NEW: Use hardcoded test data instead of generating
@@ -175,6 +176,7 @@ function createTestSession(topic: string): VideoSession {
  */
 export const VideoController: React.FC<VideoControllerProps> = ({
   initialTopic,
+  voiceId,
   onError,
   children,
   isTestMode = false, // Default to normal mode
@@ -301,7 +303,7 @@ export const VideoController: React.FC<VideoControllerProps> = ({
         // Update progress state for UI
         setGenerationProgress(progress);
         console.log('Generation progress:', progress);
-      });
+      }, voiceId);
       
       if (result.success && result.sections && result.sections.length > 0) {
         const detailByUrl = new Map<string, SectionDetail>();
@@ -514,7 +516,7 @@ export const VideoController: React.FC<VideoControllerProps> = ({
         
         const result = await generateVideoScenes(newTopic, (progress) => {
           console.log(`[${request.id}] Generation progress:`, progress);
-        });
+        }, voiceId);
         
         if (result.success && result.sections && result.sections.length > 0) {
           const detailByUrl = new Map<string, SectionDetail>();
@@ -702,7 +704,7 @@ export const VideoController: React.FC<VideoControllerProps> = ({
         // Generate video for this phase using Modal backend with full context
         const result = await generateVideoScenes(contextualTopic, (progress) => {
           console.log(`[${request.id}] Video ${i + 1} progress:`, progress);
-        });
+        }, voiceId);
         
         if (result.success && result.sections && result.sections.length > 0) {
           // Create segment from first section (we only need one video per phase)
@@ -899,7 +901,7 @@ export const VideoController: React.FC<VideoControllerProps> = ({
           
           const videoResult = await generateVideoScenes(explanationTopic, (progress) => {
             setGenerationProgress(progress);
-          });
+          }, voiceId);
           
           if (videoResult.success && videoResult.sections && videoResult.sections.length > 0) {
             const videoUrl = videoResult.sections[0];

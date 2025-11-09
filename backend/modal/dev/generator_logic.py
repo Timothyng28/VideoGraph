@@ -60,7 +60,8 @@ def generate_educational_video_logic(
     image_context: Optional[str] = None,
     clerk_user_id: Optional[str] = None,
     render_single_scene_fn: Optional[Callable] = None,
-    mode: str = "deep"
+    mode: str = "deep",
+    voice_id: Optional[str] = None
 ):
     """
     Generate a complete educational video from a prompt with optional image context.
@@ -74,6 +75,7 @@ def generate_educational_video_logic(
         mode: Generation mode - "deep" (slower, higher quality) or "fast" (faster, good quality)
               - deep: Uses Anthropic Claude Sonnet 4.5 for code generation
               - fast: Uses Cerebras Qwen 3 for code generation
+        voice_id: Optional ElevenLabs voice ID for narration
 
     Yields:
         Progress updates and final video URL
@@ -86,7 +88,7 @@ def generate_educational_video_logic(
     from pathlib import Path
 
     sys.path.insert(0, '/root')
-    from services.prompts import MEGA_PLAN_PROMPT
+    from services.prompts import get_manim_meta_prompt, MEGA_PLAN_PROMPT
 
     # Configuration
     job_id = job_id or str(uuid.uuid4())
@@ -320,10 +322,12 @@ def generate_educational_video_logic(
         # Import asyncio for parallel audio generation
         import asyncio
         
-        # Create TTS service
+        # Create TTS service with custom or default voice
         from services.tts import ElevenLabsTimedService
+        selected_voice_id = voice_id or "XfNU2rGpBa01ckF309OY"
+        print(f"🎙️  Using ElevenLabs voice ID: {selected_voice_id}")
         tts_service = ElevenLabsTimedService(
-            voice_id="pqHfZKP75CvOlQylNhV4",
+            voice_id=selected_voice_id,
             transcription_model=None
         )
 
@@ -512,12 +516,9 @@ Use this exact text in the self.voiceover() calls for proper synchronization.
                     print(f"⚠️  [Section {section_num} V{variant_num}] No pre-generated audio, will use TTS during rendering")
                     audio_instruction = "\n\nNote: Generate voiceover using ElevenLabsService as usual."
 
-                # Prepare system prompt (Manim guidelines and requirements)
-                from services.prompts import get_manim_prompt
-                system_prompt = get_manim_prompt()
-                
-                # Prepare user prompt (section-specific information)
-                user_prompt = f"""Topic: {prompt}
+                section_prompt = f"""{get_manim_meta_prompt(voice_id)}
+
+Topic: {prompt}
 Section: {section['section']} (Duration: {section['duration']})
 Content: {section['content']}
 
@@ -526,17 +527,16 @@ Generate a SINGLE scene for this section only. The scene should be self-containe
 
                 # Add image context note if provided
                 if image_context:
-                    user_prompt += "\n\nNOTE: An image was provided as context for this video. When creating visual demonstrations, consider referencing elements or concepts visible in that image."
+                    section_prompt += "\n\nNOTE: An image was provided as context for this video. When creating visual demonstrations, consider referencing elements or concepts visible in that image."
 
                 print(f"🤖 [Section {section_num} V{variant_num}] Calling {code_provider} {code_model}...")
 
                 # Use slightly higher temperature for variants to get diversity
                 temp = TEMP if variant_num == 1 else TEMP + 0.1
                 
-                # Text-only API call using llm service with system prompt
+                # Text-only API call using llm service
                 manim_code = await code_llm_service.generate_simple_async(
-                    prompt=user_prompt,
-                    system_prompt=system_prompt,
+                    prompt=section_prompt,
                     max_tokens=MAX_TOKENS,
                     temperature=temp
                 )
@@ -551,8 +551,8 @@ Generate a SINGLE scene for this section only. The scene should be self-containe
                 # Clean the code to remove problematic parameters
                 from services.code_utils import apply_all_manual_fixes, clean_manim_code
 
-                manim_code = clean_manim_code(manim_code)
-                manim_code = apply_all_manual_fixes(manim_code)
+                manim_code = clean_manim_code(manim_code, voice_id)
+                manim_code = apply_all_manual_fixes(manim_code, voice_id)
                 print(f"✓ [Section {section_num} V{variant_num}] Code cleaned and fixed")
 
                 # Extract voiceover narration script for this section
@@ -595,7 +595,7 @@ Generate a SINGLE scene for this section only. The scene should be self-containe
                     
                 try:
                     print(f"🚀 [Section {section_num} V{variant_num}] Spawning render container...")
-                    render_call = render_single_scene_fn.spawn(section_num, code, str(work_dir), job_id)
+                    render_call = render_single_scene_fn.spawn(section_num, code, str(work_dir), job_id, voice_id or "XfNU2rGpBa01ckF309OY")
                     
                     # Wait for render to complete
                     print(f"⏳ [Section {section_num} V{variant_num}] Waiting for render...")
@@ -643,8 +643,8 @@ Generate a SINGLE scene for this section only. The scene should be self-containe
                         )
                         
                         # First, try rule-based fixes
-                        fixed_code = clean_manim_code(code)
-                        fixed_code = apply_all_manual_fixes(fixed_code)
+                        fixed_code = clean_manim_code(code, voice_id)
+                        fixed_code = apply_all_manual_fixes(fixed_code, voice_id)
                         
                         # Additional aggressive fixes for common errors
                         import re
@@ -724,8 +724,8 @@ Generate the fixed code now:"""
                             repaired_code = repaired_code.split('```')[1].split('```')[0].strip()
                         
                         # Apply final cleanup
-                        repaired_code = clean_manim_code(repaired_code)
-                        repaired_code = apply_all_manual_fixes(repaired_code)
+                        repaired_code = clean_manim_code(repaired_code, voice_id)
+                        repaired_code = apply_all_manual_fixes(repaired_code, voice_id)
                         
                         print(f"✅ [Section {section_num} V{variant_num}] Sonnet 4.5 repair complete")
                         return (variant_num, repaired_code)

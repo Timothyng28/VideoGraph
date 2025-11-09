@@ -46,7 +46,8 @@ export interface GenerationProgress {
  */
 export async function generateVideoScenes(
   topic: string,
-  onProgress?: (progress: GenerationProgress) => void
+  onProgress?: (progress: GenerationProgress) => void,
+  voiceId?: string
 ): Promise<{
   success: boolean;
   sections?: string[];
@@ -56,140 +57,121 @@ export async function generateVideoScenes(
   jobId?: string;
 }> {
   const modalEndpoint =
-    "https://video-gen-2--main-video-generator-dev-generate-video-api-dev.modal.run/";
+    "https://video-gen-2--main-video-generator-dev-generate-video-api.modal.run";
 
   try {
     console.log("Generating video scenes for topic:", topic);
+    console.log("🎙️ Voice ID passed to backend:", voiceId || "NOT PROVIDED - WILL DEFAULT");
 
-    const response = await fetch(modalEndpoint, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        topic: topic,
-      }),
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text().catch(() => "Unknown error");
-      return {
-        success: false,
-        error: `Request failed: ${response.status} ${response.statusText}. ${errorText}`,
-      };
-    }
-
-    // Handle SSE stream
-    const reader = response.body?.getReader();
-    const decoder = new TextDecoder();
-
-    if (!reader) {
-      return {
-        success: false,
-        error: "No response body received",
-      };
-    }
-
-    let buffer = "";
-    let finalSections: string[] | undefined;
-    let jobId: string | undefined;
-    let finalStatus: "processing" | "completed" | "failed" = "processing";
-    let finalError: string | undefined;
-    let finalSectionDetails: SectionDetail[] | undefined;
-    let finalVoiceoverScripts: SectionVoiceover[] | undefined;
-
-    while (true) {
-      const { done, value } = await reader.read();
-
-      if (done) {
-        break;
-      }
-
-      buffer += decoder.decode(value, { stream: true });
-
-      // Process complete SSE messages
-      const lines = buffer.split("\n");
-      buffer = lines.pop() || ""; // Keep incomplete line in buffer
-
-      for (const line of lines) {
-        if (line.startsWith("data: ")) {
-          try {
-            const data = JSON.parse(line.slice(6)) as GenerationProgress;
-
-            // Update progress
-            if (data.job_id) {
-              jobId = data.job_id;
-            }
-
-            if (data.status === "completed" && data.sections) {
-              finalSections = data.sections;
-              finalStatus = "completed";
-            } else if (data.status === "failed") {
-              finalStatus = "failed";
-              finalError = data.error || "Generation failed";
-            }
-
-            if (data.section_details) {
-              finalSectionDetails = data.section_details;
-            }
-
-            if (data.metadata?.voiceover_scripts) {
-              finalVoiceoverScripts = data.metadata.voiceover_scripts;
-            }
-
-            // Call progress callback
-            onProgress?.(data);
-          } catch (parseError) {
-            console.warn("Failed to parse SSE data:", line, parseError);
-          }
-        }
-      }
-    }
-
-    // Process any remaining buffer
-    if (buffer.trim()) {
-      const line = buffer.trim();
-      if (line.startsWith("data: ")) {
-        try {
-          const data = JSON.parse(line.slice(6)) as GenerationProgress;
-          if (data.status === "completed" && data.sections) {
-            finalSections = data.sections;
-            finalStatus = "completed";
-          }
-          if (data.section_details) {
-            finalSectionDetails = data.section_details;
-          }
-          if (data.metadata?.voiceover_scripts) {
-            finalVoiceoverScripts = data.metadata.voiceover_scripts;
-          }
-          onProgress?.(data);
-        } catch (parseError) {
-          console.warn("Failed to parse final SSE data:", parseError);
-        }
-      }
-    }
-
-    if (finalStatus === "completed" && finalSections) {
-      return {
-        success: true,
-        sections: finalSections,
-        sectionDetails: finalSectionDetails,
-        voiceoverScripts: finalVoiceoverScripts,
-        jobId,
-      };
-    } else if (finalStatus === "failed") {
-      return {
-        success: false,
-        error: finalError || "Generation failed",
-        jobId,
-      };
+    const requestBody: { topic: string; voice_id?: string } = {
+      topic: topic,
+    };
+    
+    // Add voice_id if provided
+    if (voiceId) {
+      requestBody.voice_id = voiceId;
+      console.log("✅ Voice ID added to request body:", voiceId);
     } else {
-      return {
-        success: false,
-        error: "Generation did not complete successfully",
-        jobId,
-      };
+      console.warn("⚠️ No voice ID provided - backend will use default (Rachel)");
     }
+
+    // Use XMLHttpRequest for better SSE streaming support (fetch has HTTP/2 issues)
+    return new Promise((resolve) => {
+      const xhr = new XMLHttpRequest();
+      xhr.open("POST", modalEndpoint, true);
+      xhr.setRequestHeader("Content-Type", "application/json");
+      
+      let buffer = "";
+      let finalSections: string[] | undefined;
+      let jobId: string | undefined;
+      let finalStatus: "processing" | "completed" | "failed" = "processing";
+      let finalError: string | undefined;
+      let finalSectionDetails: SectionDetail[] | undefined;
+      let finalVoiceoverScripts: SectionVoiceover[] | undefined;
+
+      xhr.onprogress = () => {
+        // Process new data
+        const newData = xhr.responseText.substring(buffer.length);
+        buffer = xhr.responseText;
+        
+        // Split into lines and process SSE messages
+        const lines = newData.split("\n");
+        
+        for (const line of lines) {
+          if (line.startsWith("data: ")) {
+            try {
+              const data = JSON.parse(line.slice(6)) as GenerationProgress;
+
+              // Update progress
+              if (data.job_id) {
+                jobId = data.job_id;
+              }
+
+              if (data.status === "completed" && data.sections) {
+                finalSections = data.sections;
+                finalStatus = "completed";
+              } else if (data.status === "failed") {
+                finalStatus = "failed";
+                finalError = data.error || "Generation failed";
+              }
+
+              if (data.section_details) {
+                finalSectionDetails = data.section_details;
+              }
+
+              if (data.metadata?.voiceover_scripts) {
+                finalVoiceoverScripts = data.metadata.voiceover_scripts;
+              }
+
+              // Call progress callback
+              onProgress?.(data);
+            } catch (parseError) {
+              console.warn("Failed to parse SSE data:", line, parseError);
+            }
+          }
+        }
+      };
+
+      xhr.onload = () => {
+        if (xhr.status === 200) {
+          if (finalStatus === "completed" && finalSections) {
+            resolve({
+              success: true,
+              sections: finalSections,
+              sectionDetails: finalSectionDetails,
+              voiceoverScripts: finalVoiceoverScripts,
+              jobId,
+            });
+          } else if (finalStatus === "failed") {
+            resolve({
+              success: false,
+              error: finalError || "Generation failed",
+              jobId,
+            });
+          } else {
+            resolve({
+              success: false,
+              error: "Generation did not complete successfully",
+              jobId,
+            });
+          }
+        } else {
+          resolve({
+            success: false,
+            error: `Request failed: ${xhr.status} ${xhr.statusText}`,
+          });
+        }
+      };
+
+      xhr.onerror = () => {
+        resolve({
+          success: false,
+          error: "Network error occurred",
+        });
+      };
+
+      xhr.send(JSON.stringify(requestBody));
+    });
   } catch (error) {
     console.error("Video generation error:", error);
     return {

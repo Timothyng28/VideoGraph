@@ -6,12 +6,13 @@ Using original prompts verbatim from backend/prompts.py
 import os
 
 # TTS Provider Configuration - ElevenLabs only
-ELEVENLABS_VOICE_ID = "pqHfZKP75CvOlQylNhV4"
+ELEVENLABS_VOICE_ID = "XfNU2rGpBa01ckF309OY"  # Default voice ID
 
-def get_tts_initialization_code():
+def get_tts_initialization_code(voice_id=None):
     """Generate TTS initialization code for ElevenLabs."""
+    selected_voice = voice_id or ELEVENLABS_VOICE_ID
     return f'''from tts import ElevenLabsTimedService
-  self.set_speech_service(ElevenLabsTimedService(voice_id="{ELEVENLABS_VOICE_ID}", transcription_model=None))'''
+  self.set_speech_service(ElevenLabsTimedService(voice_id="{selected_voice}", transcription_model=None))'''
 
 MEGA_PLAN_PROMPT = """You are an educational video planner. Create a simple plan for an educational explainer video on any topic.
 
@@ -39,7 +40,12 @@ Return a JSON object with this structure:
 
 Keep it simple and focused. Adapt the structure to the topic (math, science, CS, etc.). Return only valid JSON."""
 
-MANIM_META_PROMPT = """You are an expert Manim animator creating educational explainer videos similar to 3Blue1Brown. Your task is to generate complete, runnable Manim code that creates an engaging explainer animation with exceptional spatial awareness and visual design.
+def get_manim_meta_prompt(voice_id=None):
+    """Generate Manim meta prompt with the specified voice ID."""
+    selected_voice = voice_id or ELEVENLABS_VOICE_ID
+    tts_init_code = get_tts_initialization_code(voice_id)
+    
+    return f"""You are an expert Manim animator creating educational explainer videos similar to 3Blue1Brown. Your task is to generate complete, runnable Manim code that creates an engaging explainer animation with exceptional spatial awareness and visual design.
 
 ## Core Principles:
 1. **VISUALIZE CONCEPTS, NOT JUST EQUATIONS**: Always create visual representations (shapes, diagrams, transformations) to demonstrate the concept - equations should support the visuals, not replace them
@@ -55,7 +61,7 @@ MANIM_META_PROMPT = """You are an expert Manim animator creating educational exp
 - **MANDATORY**: Include manim_voiceover imports and use self.voiceover() blocks
 - **MANDATORY**: Initialize TTS service in construct() method EXACTLY like this (NO OTHER PARAMETERS):
   ```python
-  {tts_init}
+  {tts_init_code}
   ```
 - **CRITICAL**: ALWAYS use the EXACT voice_id and transcription_model=None shown above (this is REQUIRED)
 - **CRITICAL**: DO NOT use GTTSService, AzureService, or any other TTS service - ONLY the service specified above
@@ -182,7 +188,7 @@ class ExplainerScene(Scene):
 ❌ **NEVER USE**: `RecorderService()` - It requires additional packages and causes EOFError prompts
 ✅ **CORRECT**: For standard Scene class, use only 2D elements: Axes(), NumberPlane(), .shift(), .move_to()
 ✅ **CORRECT**: For 3D, you MUST inherit from ThreeDScene: `class MyScene(ThreeDScene):`
-✅ **CORRECT**: For audio, ALWAYS use: `self.set_speech_service(ElevenLabsService(voice_id="pqHfZKP75CvOlQylNhV4"))`
+✅ **CORRECT**: For audio, ALWAYS use: `self.set_speech_service(ElevenLabsService(voice_id="{selected_voice}"))`
 ❌ **NEVER USE**: transcription_model parameter - it requires additional packages and causes errors
 ✅ **CORRECT**: For pre-generated audio, use: `from services.tts.pregenerated import PreGeneratedAudioService` (NOT from manim_voiceover.services.tts)
 
@@ -245,6 +251,9 @@ REMEMBER: Focus on QUALITY over QUANTITY - one concept explained well in 90 seco
 ## Output Format:
 Generate only the Python code. Start with imports, follow with the Scene class. Make it self-contained and runnable. Include comments for complex sections. The animation should be educational, visually engaging, and accurate to the subject matter."""
 
-def get_manim_prompt():
+# Keep MANIM_META_PROMPT for backwards compatibility (uses default voice)
+MANIM_META_PROMPT = get_manim_meta_prompt()
+
+def get_manim_prompt(voice_id=None):
     """Get the Manim prompt with TTS initialization code injected."""
-    return MANIM_META_PROMPT.format(tts_init=get_tts_initialization_code())
+    return get_manim_meta_prompt(voice_id)
