@@ -100,7 +100,12 @@ export interface VideoControllerState {
     reasoning?: string;
     error?: string;
   }>;
-  generateFollowUpVideos: (wasCorrect: boolean) => Promise<void>;
+  generateFollowUpVideos: (
+    wasCorrect: boolean,
+    question?: string,
+    userAnswer?: string,
+    evaluationReasoning?: string
+  ) => Promise<void>;
   
   // Legacy - kept for backward compatibility
   goToSegment: (index: number) => void;
@@ -1163,7 +1168,12 @@ export const VideoController: React.FC<VideoControllerProps> = ({
    * Generate follow-up videos based on answer correctness
    * Creates adaptive learning path with more complex or simpler topics
    */
-  const generateFollowUpVideos = useCallback(async (wasCorrect: boolean) => {
+  const generateFollowUpVideos = useCallback(async (
+    wasCorrect: boolean,
+    question?: string,
+    userAnswer?: string,
+    evaluationReasoning?: string
+  ) => {
     if (!currentNode || !currentSegment) {
       console.warn('No current node to generate follow-up from');
       return;
@@ -1192,7 +1202,10 @@ export const VideoController: React.FC<VideoControllerProps> = ({
         currentSegment.topic,
         branchPath,
         wasCorrect,
-        session.context
+        session.context,
+        question,
+        userAnswer,
+        evaluationReasoning
       );
 
       if (!topicResult.success || !topicResult.topic) {

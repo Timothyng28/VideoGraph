@@ -82,7 +82,10 @@ async def generate_video_api_logic(item: dict, generate_educational_video_fn):
                     headers={
                         "Cache-Control": "no-cache",
                         "Connection": "keep-alive",
-                        "X-Accel-Buffering": "no"
+                        "X-Accel-Buffering": "no",
+                        "Access-Control-Allow-Origin": "*",
+                        "Access-Control-Allow-Methods": "POST, OPTIONS",
+                        "Access-Control-Allow-Headers": "Content-Type"
                     }
                 )
         except Exception as e:
@@ -113,6 +116,9 @@ async def generate_video_api_logic(item: dict, generate_educational_video_fn):
         headers={
             "Cache-Control": "no-cache",
             "Connection": "keep-alive",
-            "X-Accel-Buffering": "no"
+            "X-Accel-Buffering": "no",
+            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Methods": "POST, OPTIONS",
+            "Access-Control-Allow-Headers": "Content-Type"
         }
     )
